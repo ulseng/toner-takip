@@ -1,0 +1,86 @@
+================================================================
+TONER TAKİP SİSTEMİ - BULUT TABANLI KURULUM REHBERİ
+Hazırlayan: Batuhan Yontuç
+================================================================
+
+Bu rehber, sistemi ÜCRETSİZ olarak internete yüklemeniz ve
+TELEFONUNUZDA uygulama olarak kullanmanız için hazırlanmıştır.
+
+ÖNEMLİ: Bu kurulumu yapmak için bilgisayarda olmanız gerekir.
+Bir kere kurduktan sonra telefonunuzdan rahatça kullanabilirsiniz.
+
+----------------------------------------------------------------
+BÖLÜM 1: FIREBASE (VERİTABANI) KURULUMU
+----------------------------------------------------------------
+Verilerin internette saklanması için Google'ın ücretsiz hizmeti
+Firebase'i kullanacağız.
+
+1.  https://console.firebase.google.com/ adresine gidin.
+2.  "Create a project" (Proje oluştur) butonuna basın.
+3.  Proje ismi olarak "toner-takip" yazın, devam edin.
+4.  "Google Analytics" seçeneğini KAPATIN (ihtiyacımız yok).
+5.  "Create Project" diyip bekleyin.
+6.  Proje açılınca sol menüden "Build" -> "Firestore Database" seçin.
+7.  "Create Database" butonuna basın.
+8.  Ayarları değiştirmeden "Next" diyin (Location: nam5 veya eur3 kalabilir).
+9.  "Start in production mode" seçili olsun. "Create" diyin.
+10. Veritabanı açılınca üstteki "Rules" sekmesine tıklayın.
+11. Kodları silin ve şunları yapıştırın (Herkesin yazmasına izin verir):
+
+    rules_version = '2';
+    service cloud.firestore {
+      match /databases/{database}/documents {
+        match /{document=**} {
+          allow read, write: if true;
+        }
+      }
+    }
+
+12. "Publish" butonuna basın.
+13. Şimdi sol üstteki "Project Overview" (Ev simgesi) yanındaki dişli çarka basın -> "Project settings".
+14. Sayfayı aşağı kaydırın. "Your apps" kısmında `</>` (Web) ikonuna tıklayın.
+15. App nickname: "TonerApp" yazın, Register app diyin.
+16. Ekrana kodlar gelecek. Oradaki `const firebaseConfig = { ... }` içindeki
+    apiKey, authDomain, projectId gibi bilgileri bir yere not edin.
+
+----------------------------------------------------------------
+BÖLÜM 2: KODLARI GÜNCELLEME
+----------------------------------------------------------------
+Şimdi bu bilgileri projemize ekleyeceğiz.
+
+1.  Bu sayfadaki kod düzenleyicide `services/firebase.ts` dosyasını açın.
+2.  Az önce not aldığınız bilgileri "BURAYA_YAZILACAK" kısımlarına yapıştırın.
+    Örnek: apiKey: "AIzaSyDjh...",
+
+----------------------------------------------------------------
+BÖLÜM 3: GITHUB'A YÜKLEME
+----------------------------------------------------------------
+Kodları internete koymak için GitHub kullanacağız.
+
+1.  www.github.com adresine gidip ücretsiz hesap açın.
+2.  Sağ üstteki "+" -> "New repository".
+3.  İsim: "toner-takip".
+4.  "Create repository" butonuna basın.
+5.  "uploading an existing file" linkine tıklayın.
+6.  Bilgisayarınızdaki proje dosyalarını buraya sürükleyin.
+7.  "Commit changes" butonuna basın.
+
+----------------------------------------------------------------
+BÖLÜM 4: VERCEL İLE YAYINA ALMA
+----------------------------------------------------------------
+1.  www.vercel.com adresine gidin, GitHub ile giriş yapın.
+2.  "Add New..." -> "Project".
+3.  GitHub'daki "toner-takip" projesini seçin (Import).
+4.  Hiçbir ayarı değiştirmeden "Deploy" butonuna basın.
+5.  1-2 dakika bekleyin. Size `toner-takip.vercel.app` gibi bir link verecek.
+
+----------------------------------------------------------------
+BÖLÜM 5: TELEFONA YÜKLEME
+----------------------------------------------------------------
+1.  Verilen linki (toner-takip.vercel.app) telefon tarayıcısında açın.
+2.  iPhone: Paylaş butonu -> "Ana Ekrana Ekle".
+3.  Android: 3 nokta -> "Uygulamayı Yükle" veya "Ana Ekrana Ekle".
+
+TEBRİKLER!
+Artık sisteminiz internette. Bilgisayardan girilen veri anında telefona gelir.
+İlk girişte kullanıcı adı: admin, şifre: yasam (veya yasam2007)
