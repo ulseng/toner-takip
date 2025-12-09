@@ -1,62 +1,51 @@
 ================================================================
-CANLI SİSTEMİ GÜNCELLEME VE SORUN GİDERME REHBERİ
+GİT OLMADAN MANUEL GÜNCELLEME REHBERİ (PROGRAMSIZ)
 ================================================================
 
-Bilgisayarınızda yaptığınız değişikliklerin (Firebase ayarları gibi)
-telefonunuzda görünmesi için "Güncelleme" yapmanız gerekir.
-Ayrıca telefonun veritabanına yazabilmesi için izinlerin açık olması şarttır.
+Bilgisayarınızda Git yüklü değilse, güncellemeyi doğrudan 
+GitHub web sitesi üzerinden "Sürükle-Bırak" yöntemiyle yapacağız.
 
 ----------------------------------------------------------------
-1. ADIM: VERİTABANI İZİNLERİNİ KONTROL ET (Çok Önemli!)
+1. ADIM: DOSYALARI HAZIRLA
 ----------------------------------------------------------------
-Telefondan kayıt yapamıyorsanız %99 ihtimalle bu ayar kapalıdır.
-
-1. https://console.firebase.google.com/ adresine girin.
-2. Projenizi (toner-takip) seçin.
-3. Sol menüden "Build" -> "Firestore Database" seçeneğine tıklayın.
-4. Üstteki sekmelerden "Rules" (Kurallar) sekmesine tıklayın.
-5. Ekrandaki kodların AYNEN şu şekilde olduğundan emin olun:
-
-   rules_version = '2';
-   service cloud.firestore {
-     match /databases/{database}/documents {
-       match /{document=**} {
-         allow read, write: if true;
-       }
-     }
-   }
-
-   DİKKAT: `if false;` yazıyorsa veya `request.auth != null` yazıyorsa
-   bunu `if true;` yapın ve "Publish" butonuna basın.
-   Bu işlem veritabanını okuma/yazmaya açar.
+1.  Bu sayfadan (AI Studio) projenin son halini indirin (Sağ üstteki indirme butonu).
+2.  İnen ZIP dosyasını masaüstüne bir klasöre çıkartın.
 
 ----------------------------------------------------------------
-2. ADIM: DEĞİŞİKLİKLERİ CANLIYA GÖNDERME (Vercel)
+2. ADIM: GITHUB'A YÜKLEME (Sürükle-Bırak Yöntemi)
 ----------------------------------------------------------------
-Bilgisayarınızdaki kodları GitHub'a gönderdiğinizde, Vercel
-otomatik olarak güncellenir.
+Telefonunuzun güncellemeyi alması için kodları GitHub'a atmamız lazım.
 
-1. Proje klasörünüzde sağ tık -> "Open in Terminal" (veya CMD açın).
-2. Sırasıyla şu komutları yazıp Enter'a basın:
+1.  www.github.com adresine gidin ve giriş yapın.
+2.  Sol taraftaki listeden veya profilinizden "toner-takip" projesine tıklayın.
+3.  Dosyaların listelendiği ekranın sağ üst kısmında "Add file" butonuna basın.
+4.  Açılan menüden "Upload files" seçeneğini seçin.
+5.  Masaüstüne çıkarttığınız proje klasörünün içindeki TÜM DOSYALARI seçin.
+6.  Seçtiğiniz dosyaları tarayıcıdaki gri alana sürükleyip bırakın.
+7.  Yükleme çubuklarının dolmasını bekleyin.
+8.  Sayfanın en altına inin. "Commit changes" başlığı altına "Guncelleme" yazın.
+9.  Yeşil renkli "Commit changes" butonuna basın.
 
-   git add .
-   git commit -m "Firebase ayarlari ve guncellemeler"
-   git push
-
-3. Bu komutlardan sonra 1-2 dakika bekleyin.
-4. Telefonunuzdan siteye (vercel.app linki) girin ve sayfayı yenileyin.
-
-NOT: Eğer `git push` hata verirse veya git kurulu değilse;
-GitHub Desktop uygulamasını kullanarak veya GitHub web sitesinden
-dosyaları manuel yükleyerek de yapabilirsiniz.
+Bunu yaptıktan sonra GitHub dosyaları işleyecek ve Vercel otomatik olarak
+güncellemeyi algılayıp sitenizi yenileyecektir.
 
 ----------------------------------------------------------------
 3. ADIM: TELEFONDA KONTROL
 ----------------------------------------------------------------
-1. Telefonunuzdan uygulamayı açın.
-2. Bir işlem yapmayı deneyin (Örn: Stok ekle).
-3. Eğer hala hata alıyorsanız tarayıcı önbelleğini temizleyin veya
-   gizli sekmeden deneyin.
-4. "Veritabanı yazma izni reddedildi" uyarısı alırsanız 1. ADIM'ı tekrar yapın.
+1.  Bu işlemden yaklaşık 1-2 dakika sonra telefonunuzdan uygulamayı açın.
+2.  Sayfayı yenileyin.
+3.  Yeni ikonları veya özellikleri görüyorsanız işlem tamamdır.
+
+----------------------------------------------------------------
+HATA ALIYORSANIZ (KAYIT YAPAMIYORSANIZ)
+----------------------------------------------------------------
+Eğer telefondan hala "Kayıt Eklenemedi" hatası alıyorsanız veritabanı
+izinlerini açmanız gerekir:
+
+1.  https://console.firebase.google.com/ adresine girin.
+2.  Projenizi seçin -> Sol menüden "Build" -> "Firestore Database".
+3.  Üstten "Rules" sekmesine gelin.
+4.  Kodların içinde "allow read, write: if true;" yazdığından emin olun.
+5.  Değilse düzeltip "Publish" butonuna basın.
 
 Hazırlayan: Batuhan Yontuç

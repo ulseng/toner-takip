@@ -55,6 +55,9 @@
         overscroll-behavior-y: none;
         -webkit-tap-highlight-color: transparent;
         touch-action: pan-x pan-y;
+        /* Fix for mobile address bar scroll issues */
+        height: 100dvh; 
+        overflow: hidden;
       }
       @supports (padding-top: env(safe-area-inset-top)) {
         body {
@@ -80,7 +83,7 @@
 </script>
 <link rel="stylesheet" href="/index.css">
 </head>
-  <body class="bg-slate-50 dark:bg-slate-900 h-screen overflow-hidden selection:bg-primary-200 selection:text-primary-900">
+  <body class="bg-slate-50 dark:bg-slate-900 selection:bg-primary-200 selection:text-primary-900">
     <div id="root" class="h-full"></div>
   <script type="module" src="/index.tsx"></script>
 </body>

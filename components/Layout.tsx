@@ -11,6 +11,8 @@ interface LayoutProps {
   toggleTheme: () => void;
 }
 
+const APP_VERSION = "v0.001";
+
 export const Layout: React.FC<LayoutProps> = ({ 
   children, activeTab, setActiveTab, onLogout, user, isDarkMode, toggleTheme 
 }) => {
@@ -31,9 +33,10 @@ export const Layout: React.FC<LayoutProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-200 flex flex-col md:flex-row">
-      {/* Mobile Header */}
-      <div className="md:hidden bg-primary-800 text-white p-4 flex justify-between items-center shadow-md sticky top-0 z-50">
+    <div className="h-full flex flex-col md:flex-row bg-slate-50 dark:bg-slate-900 transition-colors duration-200 overflow-hidden">
+      
+      {/* Mobile Header - Flex None (Fixed height) */}
+      <div className="flex-none md:hidden bg-primary-800 text-white p-4 flex justify-between items-center shadow-md z-50">
         <h1 className="text-xl font-bold">Toner Takip</h1>
         <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
           {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
@@ -42,13 +45,13 @@ export const Layout: React.FC<LayoutProps> = ({
 
       {/* Sidebar (Desktop) / Drawer (Mobile) */}
       <aside className={`
-        fixed md:static inset-y-0 left-0 z-40 w-64 bg-primary-900 text-primary-50 transform transition-transform duration-200 ease-in-out
+        fixed md:static inset-y-0 left-0 z-40 w-64 bg-primary-900 text-primary-50 transform transition-transform duration-200 ease-in-out h-full flex flex-col shadow-xl
         ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
-        md:translate-x-0 flex flex-col shadow-xl
+        md:translate-x-0
       `}>
         <div className="p-6 hidden md:block border-b border-primary-800">
           <h1 className="text-2xl font-bold text-white">Toner Takip</h1>
-          <p className="text-xs text-primary-200 mt-1">v1.3.0 - Service Module</p>
+          <p className="text-xs text-primary-200 mt-1">Sürüm: {APP_VERSION}</p>
         </div>
 
         <div className="p-4 bg-primary-800 md:hidden">
@@ -56,7 +59,7 @@ export const Layout: React.FC<LayoutProps> = ({
           <p className="font-semibold text-white">{user.name}</p>
         </div>
 
-        <nav className="flex-1 px-2 py-4 space-y-2">
+        <nav className="flex-1 px-2 py-4 space-y-2 overflow-y-auto">
           {navItems.map((item) => (
             <button
               key={item.id}
@@ -73,7 +76,7 @@ export const Layout: React.FC<LayoutProps> = ({
           ))}
         </nav>
 
-        <div className="p-4 border-t border-primary-800 space-y-3">
+        <div className="p-4 border-t border-primary-800 space-y-3 bg-primary-900">
            <div className="hidden md:block px-2">
             <p className="text-xs text-primary-300">Kullanıcı</p>
             <p className="font-medium text-sm truncate text-white">{user.name}</p>
@@ -97,10 +100,23 @@ export const Layout: React.FC<LayoutProps> = ({
         </div>
       </aside>
 
-      {/* Main Content */}
-      <main className="flex-1 p-4 md:p-8 overflow-y-auto h-[calc(100vh-64px)] md:h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100">
-        <div className="max-w-5xl mx-auto">
-          {children}
+      {/* Main Content Area - Flex 1 (Takes remaining space) */}
+      <main className="flex-1 flex flex-col relative overflow-hidden bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100">
+        
+        {/* Scrollable Content Container */}
+        <div className="flex-1 overflow-y-auto p-4 md:p-8 scroll-smooth">
+          <div className="max-w-5xl mx-auto min-h-full flex flex-col">
+            <div className="flex-1">
+              {children}
+            </div>
+            
+            {/* Footer with Version - Always at bottom of content */}
+            <footer className="mt-8 py-4 text-center">
+              <p className="text-[10px] text-slate-400 font-mono tracking-widest uppercase">
+                Toner Takip Sistemi <span className="text-primary-500 font-bold">{APP_VERSION}</span>
+              </p>
+            </footer>
+          </div>
         </div>
       </main>
 
