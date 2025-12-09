@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Search, MapPin, Hash, Printer as PrinterIcon, Edit2, X, Wifi, Usb, Globe, Trash2, History, Truck, AlertTriangle, QrCode, FileSpreadsheet, Download, CheckCircle2, XCircle, AlertCircle, Archive, RefreshCw } from 'lucide-react';
 import { Printer, SystemConfig, StockLog, ServiceRecord, PrinterStatus } from '../types';
 import { StorageService } from '../services/storage';
+import { LoadingScreen } from './LoadingScreen';
 
 interface PrinterListProps {
   onSelectPrinter?: (printer: Printer) => void;
@@ -232,7 +233,7 @@ export const PrinterList: React.FC<PrinterListProps> = ({ onSelectPrinter, targe
   };
 
   if (loading) {
-     return <div className="flex justify-center items-center h-64 text-slate-500">Yazıcılar yükleniyor...</div>;
+     return <LoadingScreen message="Yazıcılar listeleniyor..." />;
   }
 
   return (

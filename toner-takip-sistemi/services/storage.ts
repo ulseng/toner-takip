@@ -19,18 +19,29 @@ const INITIAL_CONFIG: SystemConfig = {
   whatsappNumber: ''
 };
 
+// Helper to handle Firestore errors
+const handleDbError = (error: any, context: string) => {
+  console.error(`Error in ${context}:`, error);
+  if (error.code === 'permission-denied') {
+    alert('HATA: Veritabanı yazma izni reddedildi!\n\nFirebase Console > Firestore Database > Rules sekmesinden "allow read, write: if true;" ayarını yaptığınızdan emin olun.');
+  } else {
+    alert(`İşlem sırasında hata oluştu: ${error.message}`);
+  }
+  throw error;
+};
+
 export const StorageService = {
   
   // --- AUTH ---
   getUsers: async (): Promise<User[]> => {
     try {
       const snapshot = await getDocs(collection(db, COLLECTIONS.USERS));
-      const users = snapshot.docs.map(doc => ({ ...doc.data() } as User));
+      const users = snapshot.docs.map(doc => ({ ...doc.data() as any } as User));
       
       // If no users exist (first run), create admin
       if (users.length === 0) {
-        const defaultAdmin: User = { username: 'admin', name: 'Sistem Yöneticisi', role: 'admin', password: 'yasam' }; // Varsayılan şifre basitleştirildi
-        await addDoc(collection(db, COLLECTIONS.USERS), defaultAdmin);
+        const defaultAdmin: User = { username: 'admin', name: 'Sistem Yöneticisi', role: 'admin', password: 'yasam' }; 
+        await addDoc(collection(db, COLLECTIONS.USERS), defaultAdmin).catch(e => handleDbError(e, 'createDefaultUser'));
         return [defaultAdmin];
       }
       return users;
@@ -54,64 +65,76 @@ export const StorageService = {
   getPrinters: async (): Promise<Printer[]> => {
     try {
       const snapshot = await getDocs(collection(db, COLLECTIONS.PRINTERS));
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Printer));
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as any } as Printer));
     } catch (e) {
       console.error("Error getPrinters", e);
       return [];
     }
   },
 
-  // In Firebase, we add individually, not save the whole array
   addPrinter: async (printer: Printer) => {
-    const { id, ...data } = printer; // Remove ID if it exists (Firestore generates one) or let Firestore handle it
-    const docRef = await addDoc(collection(db, COLLECTIONS.PRINTERS), data);
-    return docRef.id;
+    try {
+      const { id, ...data } = printer; 
+      const docRef = await addDoc(collection(db, COLLECTIONS.PRINTERS), data);
+      return docRef.id;
+    } catch (e) {
+      handleDbError(e, 'addPrinter');
+      return '';
+    }
   },
 
   updatePrinter: async (printer: Printer) => {
     if (!printer.id) return;
-    const printerRef = doc(db, COLLECTIONS.PRINTERS, printer.id);
-    const { id, ...data } = printer;
-    await updateDoc(printerRef, data);
+    try {
+      const printerRef = doc(db, COLLECTIONS.PRINTERS, printer.id);
+      const { id, ...data } = printer;
+      await updateDoc(printerRef, data);
+    } catch (e) {
+      handleDbError(e, 'updatePrinter');
+    }
   },
 
   deletePrinter: async (printerId: string) => {
-    await deleteDoc(doc(db, COLLECTIONS.PRINTERS, printerId));
+    try {
+      await deleteDoc(doc(db, COLLECTIONS.PRINTERS, printerId));
+    } catch (e) {
+      handleDbError(e, 'deletePrinter');
+    }
   },
 
   // --- STOCKS ---
   getStocks: async (): Promise<TonerStock[]> => {
     try {
       const snapshot = await getDocs(collection(db, COLLECTIONS.STOCKS));
-      return snapshot.docs.map(doc => ({ ...doc.data() } as TonerStock));
+      return snapshot.docs.map(doc => ({ ...doc.data() as any } as TonerStock));
     } catch (e) {
       console.error("Error getStocks", e);
       return [];
     }
   },
 
-  // We need to sync stocks carefully. 
-  // For simplicity in migration, we will overwrite the specific stock model document
   saveStock: async (stock: TonerStock) => {
-    // Check if doc exists with this model name to update, or add new
-    const q = query(collection(db, COLLECTIONS.STOCKS));
-    const snapshot = await getDocs(q);
-    const existingDoc = snapshot.docs.find(d => d.data().modelName === stock.modelName);
+    try {
+      const q = query(collection(db, COLLECTIONS.STOCKS));
+      const snapshot = await getDocs(q);
+      const existingDoc = snapshot.docs.find(d => (d.data() as TonerStock).modelName === stock.modelName);
 
-    if (existingDoc) {
-      await updateDoc(doc(db, COLLECTIONS.STOCKS, existingDoc.id), { quantity: stock.quantity });
-    } else {
-      await addDoc(collection(db, COLLECTIONS.STOCKS), stock);
+      if (existingDoc) {
+        await updateDoc(doc(db, COLLECTIONS.STOCKS, existingDoc.id), { quantity: stock.quantity });
+      } else {
+        await addDoc(collection(db, COLLECTIONS.STOCKS), stock);
+      }
+    } catch (e) {
+      handleDbError(e, 'saveStock');
     }
   },
 
   // --- LOGS ---
   getLogs: async (): Promise<StockLog[]> => {
     try {
-      // Order by date desc
       const q = query(collection(db, COLLECTIONS.LOGS), orderBy('date', 'desc'));
       const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as StockLog));
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as any } as StockLog));
     } catch (e) {
       console.error("Error getLogs", e);
       return [];
@@ -119,8 +142,12 @@ export const StorageService = {
   },
 
   addLog: async (log: StockLog) => {
-    const { id, ...data } = log;
-    await addDoc(collection(db, COLLECTIONS.LOGS), data);
+    try {
+      const { id, ...data } = log;
+      await addDoc(collection(db, COLLECTIONS.LOGS), data);
+    } catch (e) {
+      handleDbError(e, 'addLog');
+    }
   },
 
   // --- SERVICES ---
@@ -128,19 +155,22 @@ export const StorageService = {
      try {
       const q = query(collection(db, COLLECTIONS.SERVICES), orderBy('date', 'desc'));
       const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ServiceRecord));
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as any } as ServiceRecord));
      } catch (e) {
        return [];
      }
   },
 
   addServiceRecord: async (record: ServiceRecord) => {
-    const { id, ...data } = record;
-    await addDoc(collection(db, COLLECTIONS.SERVICES), data);
+    try {
+      const { id, ...data } = record;
+      await addDoc(collection(db, COLLECTIONS.SERVICES), data);
+    } catch (e) {
+      handleDbError(e, 'addServiceRecord');
+    }
   },
 
   // --- CONFIG ---
-  // Store config as a single document with ID 'main_config'
   getConfig: async (): Promise<SystemConfig> => {
     try {
       const docRef = doc(db, COLLECTIONS.CONFIG, 'main_config');
@@ -149,7 +179,6 @@ export const StorageService = {
       if (docSnap.exists()) {
         return docSnap.data() as SystemConfig;
       } else {
-        // Init default
         await setDoc(docRef, INITIAL_CONFIG);
         return INITIAL_CONFIG;
       }
@@ -159,13 +188,15 @@ export const StorageService = {
   },
 
   saveConfig: async (config: SystemConfig) => {
-    const docRef = doc(db, COLLECTIONS.CONFIG, 'main_config');
-    await setDoc(docRef, config);
+    try {
+      const docRef = doc(db, COLLECTIONS.CONFIG, 'main_config');
+      await setDoc(docRef, config);
+    } catch (e) {
+      handleDbError(e, 'saveConfig');
+    }
   },
 
-  // DB Maintenance is mostly auto-handled by Firestore structure now
   runMaintenance: async () => {
-     // Just trigger a config fetch to ensure defaults
      await StorageService.getConfig();
   }
 };

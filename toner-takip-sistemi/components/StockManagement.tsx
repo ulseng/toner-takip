@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ArrowDown, ArrowUp, CheckCircle, AlertTriangle, Search, Banknote, Calendar, Settings as SettingsIcon, MessageCircle, Printer as PrinterIcon } from 'lucide-react';
 import { TonerStock, Printer, StockLog, SystemConfig } from '../types';
 import { StorageService } from '../services/storage';
+import { LoadingScreen } from './LoadingScreen';
 
 interface StockManagementProps {
   user: { name: string };
@@ -203,7 +204,7 @@ export const StockManagement: React.FC<StockManagementProps> = ({ user }) => {
   };
 
   if (loading) {
-    return <div className="p-8 text-center text-slate-500">Stok verileri yükleniyor...</div>;
+    return <LoadingScreen message="Stok verileri güncelleniyor..." />;
   }
 
   return (

@@ -3,6 +3,7 @@ import { StorageService } from '../services/storage';
 import { Printer, TonerStock, StockLog, ServiceRecord } from '../types';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, BarChart, Bar, XAxis, YAxis } from 'recharts';
 import { AlertCircle, CheckCircle2, Clock, Printer as PrinterIcon, Wallet, Wrench, RefreshCw } from 'lucide-react';
+import { LoadingScreen } from './LoadingScreen';
 
 export const Dashboard: React.FC = () => {
   const [printers, setPrinters] = useState<Printer[]>([]);
@@ -31,7 +32,7 @@ export const Dashboard: React.FC = () => {
   }, []);
 
   if (loading) {
-      return <div className="flex justify-center items-center h-64 text-slate-500">Yükleniyor...</div>;
+      return <LoadingScreen message="Özet raporlar hazırlanıyor..." />;
   }
 
   const totalPrinters = printers.length;

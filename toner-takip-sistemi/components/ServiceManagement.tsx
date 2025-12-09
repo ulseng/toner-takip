@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { StorageService } from '../services/storage';
 import { Printer, ServiceRecord, User } from '../types';
 import { Wrench, Plus, Save, Clock, CheckCircle2, XCircle } from 'lucide-react';
+import { LoadingScreen } from './LoadingScreen';
 
 interface ServiceManagementProps {
   // empty
@@ -75,7 +76,7 @@ export const ServiceManagement: React.FC<ServiceManagementProps> = () => {
   };
 
   if (loading) {
-    return <div className="p-8 text-center text-slate-500">Servis kayıtları yükleniyor...</div>;
+    return <LoadingScreen message="Servis kayıtları yükleniyor..." />;
   }
 
   return (

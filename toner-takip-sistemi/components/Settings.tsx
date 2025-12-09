@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, Save, Tag, Box, MessageCircle, Truck, RefreshCw, Edit2, X, AlertTriangle, Droplet } from 'lucide-react';
 import { StorageService } from '../services/storage';
 import { SystemConfig, Printer } from '../types';
+import { LoadingScreen } from './LoadingScreen';
 
 type ConfigType = 'brands' | 'models' | 'suppliers' | 'tonerModels';
 
@@ -170,7 +171,7 @@ export const Settings: React.FC = () => {
     </div>
   );
 
-  if (loading) return <div className="p-8 text-center text-slate-500">Ayarlar yükleniyor...</div>;
+  if (loading) return <LoadingScreen message="Sistem ayarları yükleniyor..." />;
 
   return (
     <div className="space-y-6 pb-20">

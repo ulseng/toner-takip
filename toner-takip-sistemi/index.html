@@ -12,9 +12,9 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="application-name" content="Toner Takip">
     
-    <!-- App Icon -->
-    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2829/2829803.png">
-    <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/2829/2829803.png">
+    <!-- App Icon (New Blue Modern Printer Icon) -->
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2659/2659360.png">
+    <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/2659/2659360.png">
 
     <title>Toner Takip Sistemi</title>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -37,6 +37,9 @@
                 900: '#1e3a8a', 
                 950: '#172554', 
               }
+            },
+            animation: {
+              'pulse-fast': 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite',
             }
           }
         }
@@ -48,11 +51,23 @@
       ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
       ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
       .dark ::-webkit-scrollbar-thumb { background: #475569; }
-      body {
+      
+      html, body {
+        margin: 0;
+        padding: 0;
+        height: 100dvh; /* Dynamic Viewport Height for Mobile */
+        width: 100%;
+        overflow: hidden; /* Prevent body scroll */
         overscroll-behavior-y: none;
         -webkit-tap-highlight-color: transparent;
         touch-action: pan-x pan-y;
       }
+
+      #root {
+        height: 100%;
+        width: 100%;
+      }
+
       @supports (padding-top: env(safe-area-inset-top)) {
         body {
           padding-top: env(safe-area-inset-top);
@@ -77,8 +92,8 @@
 </script>
 <link rel="stylesheet" href="/index.css">
 </head>
-  <body class="bg-slate-50 dark:bg-slate-900 h-screen overflow-hidden selection:bg-primary-200 selection:text-primary-900">
-    <div id="root" class="h-full"></div>
+  <body class="bg-slate-50 dark:bg-slate-900 selection:bg-primary-200 selection:text-primary-900">
+    <div id="root"></div>
   <script type="module" src="/index.tsx"></script>
 </body>
 </html>

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { StorageService } from '../services/storage';
 import { StockLog } from '../types';
 import { ArrowDown, ArrowUp, Download, FileSpreadsheet } from 'lucide-react';
+import { LoadingScreen } from './LoadingScreen';
 
 export const History: React.FC = () => {
   const [logs, setLogs] = useState<StockLog[]>([]);
@@ -62,7 +63,7 @@ export const History: React.FC = () => {
   };
 
   if (loading) {
-      return <div className="p-8 text-center text-slate-500">Geçmiş kayıtları yükleniyor...</div>;
+      return <LoadingScreen message="İşlem geçmişi yükleniyor..." />;
   }
 
   return (
