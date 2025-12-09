@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { User } from '../types';
-import { Moon, Sun } from 'lucide-react';
+import { Moon, Sun, Printer } from 'lucide-react';
 import { StorageService } from '../services/storage';
 
 interface LoginProps {
@@ -45,7 +45,10 @@ export const Login: React.FC<LoginProps> = ({ onLogin, isDarkMode, toggleTheme }
         )}
       </div>
       <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-md overflow-hidden border border-slate-200 dark:border-slate-700">
-        <div className="bg-primary-800 p-8 text-center">
+        <div className="bg-primary-800 p-8 text-center flex flex-col items-center justify-center">
+          <div className="bg-white/10 p-3 rounded-2xl shadow-inner mb-4">
+             <Printer size={48} className="text-primary-100" />
+          </div>
           <h1 className="text-3xl font-bold text-white mb-2">Toner Takip</h1>
           <p className="text-primary-200">Personel Girişi (Online)</p>
         </div>
