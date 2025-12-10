@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, MapPin, Hash, Printer as PrinterIcon, Edit2, X, Wifi, Usb, Globe, Trash2, History, Truck, AlertTriangle, QrCode, FileSpreadsheet, Download, CheckCircle2, XCircle, AlertCircle, Archive, RefreshCw, Users, UserPlus, Filter, Wallet, Calendar } from 'lucide-react';
+import { Plus, Search, MapPin, Hash, Printer as PrinterIcon, Edit2, X, Wifi, Usb, Globe, Trash2, History, Truck, AlertTriangle, QrCode, FileSpreadsheet, Download, CheckCircle2, XCircle, AlertCircle, Archive, RefreshCw, Users, UserPlus, Filter, Wallet, Calendar, Database, ArrowRight } from 'lucide-react';
 import { Printer, SystemConfig, StockLog, ServiceRecord, PrinterStatus } from '../types';
 import { StorageService } from '../services/storage';
 import { LoadingScreen } from './LoadingScreen';
+import { INITIAL_PRINTER_DATA } from './Settings';
 
 interface PrinterListProps {
   onSelectPrinter?: (printer: Printer) => void;
@@ -20,7 +21,7 @@ interface PrinterStats {
 
 export const PrinterList: React.FC<PrinterListProps> = ({ onSelectPrinter, targetPrinterId, clearTarget }) => {
   const [printers, setPrinters] = useState<Printer[]>([]);
-  const [config, setConfig] = useState<SystemConfig>({ brands: [], models: [], suppliers: [], tonerModels: [] });
+  const [config, setConfig] = useState<SystemConfig>({ brands: [], models: [], suppliers: [], tonerModels: [], brandImages: {}, modelImages: {} });
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   
@@ -38,6 +39,9 @@ export const PrinterList: React.FC<PrinterListProps> = ({ onSelectPrinter, targe
 
   const [editingPrinter, setEditingPrinter] = useState<Printer | null>(null);
   const [selectedPrinterHistory, setSelectedPrinterHistory] = useState<{printer: Printer, tonerLogs: StockLog[], serviceLogs: ServiceRecord[], stats: PrinterStats} | null>(null);
+
+  // Quick Import State
+  const [isQuickImporting, setIsQuickImporting] = useState(false);
 
   // Form State
   const [formData, setFormData] = useState<Partial<Printer>>({
@@ -106,8 +110,13 @@ export const PrinterList: React.FC<PrinterListProps> = ({ onSelectPrinter, targe
 
   // --- HELPER: BRAND LOGO ---
   const getBrandLogoUrl = (brand: string) => {
+    // 1. Check custom user uploaded image from config
+    if (config.brandImages && config.brandImages[brand]) {
+        return config.brandImages[brand];
+    }
+
+    // 2. Fallback to Simple Icons CDN
     const b = brand.toLowerCase();
-    // Simple Icons CDN - trustworthy and comprehensive
     if (b.includes('canon')) return 'https://cdn.simpleicons.org/canon/CC0000';
     if (b.includes('hp')) return 'https://cdn.simpleicons.org/hp/0096D6';
     if (b.includes('epson')) return 'https://cdn.simpleicons.org/epson/003399';
@@ -118,6 +127,53 @@ export const PrinterList: React.FC<PrinterListProps> = ({ onSelectPrinter, targe
     if (b.includes('lexmark')) return 'https://cdn.simpleicons.org/lexmark/202020';
     if (b.includes('oki')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/db/OKI_Logo.svg/320px-OKI_Logo.svg.png'; // Fallback for OKI
     return null; // fallback to text
+  };
+
+  // --- HELPER: MODEL IMAGE ---
+  const getModelImageUrl = (model: string) => {
+      if (config.modelImages && config.modelImages[model]) {
+          return config.modelImages[model];
+      }
+      return null;
+  }
+
+  // --- QUICK IMPORT ---
+  const handleQuickImport = async () => {
+    setIsQuickImporting(true);
+    try {
+        for (const item of INITIAL_PRINTER_DATA) {
+            const isUsb = item.ip === 'USB' || item.ip === '-' || item.ip === '' || item.ip === null;
+            const connectionType = isUsb ? 'USB' : 'Network';
+            let ipAddress = '';
+            if (!isUsb) {
+                ipAddress = item.ip.length <= 3 ? `192.168.1.${item.ip}` : item.ip;
+            }
+
+            const newPrinter: Printer = {
+                id: '',
+                serialNumber: item.s,
+                brand: 'Canon',
+                model: item.m,
+                location: item.l,
+                floor: 'Giriş/Poliklinik',
+                lastCounter: 0,
+                lastTonerDate: new Date().toISOString(),
+                compatibleToner: '',
+                connectionType,
+                ipAddress,
+                supplier: 'Anahtar Bilgisayar',
+                status: 'ACTIVE',
+                connectedUsers: []
+            };
+            await StorageService.addPrinter(newPrinter);
+            await new Promise(resolve => setTimeout(resolve, 30));
+        }
+        await loadData();
+    } catch (e) {
+        alert('Yükleme hatası.');
+    } finally {
+        setIsQuickImporting(false);
+    }
   };
 
   // --- ACTIONS ---
@@ -341,8 +397,8 @@ export const PrinterList: React.FC<PrinterListProps> = ({ onSelectPrinter, targe
     }
   };
 
-  if (loading) {
-     return <LoadingScreen message="Yazıcılar listeleniyor..." />;
+  if (loading || isQuickImporting) {
+     return <LoadingScreen message={isQuickImporting ? "Veriler yükleniyor..." : "Yazıcılar listeleniyor..."} />;
   }
 
   return (
@@ -428,6 +484,7 @@ export const PrinterList: React.FC<PrinterListProps> = ({ onSelectPrinter, targe
           const statusInfo = getStatusLabel(printer.status || 'ACTIVE');
           const cardStyle = getStatusColor(printer.status || 'ACTIVE');
           const brandLogo = getBrandLogoUrl(printer.brand);
+          const modelImage = getModelImageUrl(printer.model);
 
           return (
             <div 
@@ -471,41 +528,53 @@ export const PrinterList: React.FC<PrinterListProps> = ({ onSelectPrinter, targe
                     </div>
                 </div>
 
-                {/* 2. ROW: Model Name */}
-                <h3 className="text-2xl font-bold text-zinc-800 dark:text-white mb-2 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
-                  {printer.model}
-                </h3>
-                
-                {/* 3. ROW: Brand Logo & Details */}
-                <div className="space-y-3 mt-4">
+                <div className="flex gap-4">
+                    <div className="flex-1">
+                        {/* 2. ROW: Model Name */}
+                        <h3 className="text-2xl font-bold text-zinc-800 dark:text-white mb-2 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+                        {printer.model}
+                        </h3>
+                        
+                        {/* 3. ROW: Brand Logo & Details */}
+                        <div className="space-y-3 mt-4">
+                            
+                            {/* Brand with Logo */}
+                            <div className="flex items-center gap-2 mb-4">
+                            {brandLogo ? (
+                                <img src={brandLogo} alt={printer.brand} className="h-6 w-auto opacity-80 dark:opacity-100 dark:invert-[.10]" />
+                            ) : (
+                                <span className="font-bold text-zinc-400">{printer.brand}</span>
+                            )}
+                            {brandLogo && <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest">{printer.brand}</span>}
+                            </div>
+
+                            <div className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400 text-sm border-t border-zinc-100 dark:border-zinc-800 pt-3">
+                            <Hash size={16} className="text-zinc-400" />
+                            <span className="font-mono">{printer.serialNumber}</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400 text-sm">
+                            {printer.connectionType === 'Network' ? <Globe size={16} className="text-emerald-500"/> : <Usb size={16} className="text-zinc-400"/>}
+                            <span className="font-mono text-xs">{printer.connectionType === 'Network' ? printer.ipAddress : 'USB Bağlantı'}</span>
+                            </div>
+
+                            {/* Users Summary Pill */}
+                            {printer.connectedUsers && printer.connectedUsers.length > 0 && (
+                                <div className="flex items-center gap-1.5 mt-2 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 px-2 py-1 rounded text-xs w-fit">
+                                    <Users size={12} />
+                                    <span>{printer.connectedUsers.length} Kullanıcı Bağlı</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
                     
-                    {/* Brand with Logo */}
-                    <div className="flex items-center gap-2 mb-4">
-                       {brandLogo ? (
-                          <img src={brandLogo} alt={printer.brand} className="h-6 w-auto opacity-80 dark:opacity-100 dark:invert-[.10]" />
-                       ) : (
-                          <span className="font-bold text-zinc-400">{printer.brand}</span>
-                       )}
-                       {brandLogo && <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest">{printer.brand}</span>}
-                    </div>
-
-                    <div className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400 text-sm border-t border-zinc-100 dark:border-zinc-800 pt-3">
-                      <Hash size={16} className="text-zinc-400" />
-                      <span className="font-mono">{printer.serialNumber}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400 text-sm">
-                      {printer.connectionType === 'Network' ? <Globe size={16} className="text-emerald-500"/> : <Usb size={16} className="text-zinc-400"/>}
-                      <span className="font-mono text-xs">{printer.connectionType === 'Network' ? printer.ipAddress : 'USB Bağlantı'}</span>
-                    </div>
-
-                    {/* Users Summary Pill */}
-                    {printer.connectedUsers && printer.connectedUsers.length > 0 && (
-                        <div className="flex items-center gap-1.5 mt-2 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 px-2 py-1 rounded text-xs w-fit">
-                            <Users size={12} />
-                            <span>{printer.connectedUsers.length} Kullanıcı Bağlı</span>
+                    {/* Optional Model Image Column */}
+                    {modelImage && (
+                        <div className="w-24 shrink-0 flex items-center justify-center">
+                            <img src={modelImage} alt={printer.model} className="max-h-32 w-full object-contain drop-shadow-md rounded-md" />
                         </div>
                     )}
                 </div>
+
               </div>
 
               {/* ACTION FOOTER */}
@@ -531,7 +600,17 @@ export const PrinterList: React.FC<PrinterListProps> = ({ onSelectPrinter, targe
            <div className="col-span-full flex flex-col items-center justify-center py-20 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl border-2 border-dashed border-zinc-200 dark:border-zinc-700">
               <PrinterIcon size={48} className="text-zinc-300 mb-4" />
               <p className="text-zinc-500 font-medium">Kayıtlı yazıcı bulunamadı</p>
-              <p className="text-zinc-400 text-sm">Filtreleri değiştirmeyi deneyin</p>
+              
+              <div className="mt-6 flex flex-col gap-3 w-full max-w-sm px-6">
+                <p className="text-zinc-400 text-xs text-center">Eğer ilk kurulum yapıyorsanız, aşağıdaki butonu kullanarak Excel verilerini yükleyebilirsiniz.</p>
+                <button 
+                    onClick={handleQuickImport}
+                    className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl transition-colors shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2"
+                >
+                    <Database size={18} />
+                    Hızlı Kurulum (Excel Verilerini Yükle) <ArrowRight size={16}/>
+                </button>
+              </div>
            </div>
         )}
       </div>
