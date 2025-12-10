@@ -63,4 +63,7 @@ export interface SystemConfig {
   suppliers: string[]; // List of vendors
   tonerModels: string[]; // New: List of toner types
   whatsappNumber?: string; // For notifications
+  // New Image Maps (Key: Name, Value: Image URL)
+  brandImages?: Record<string, string>; 
+  modelImages?: Record<string, string>;
 }

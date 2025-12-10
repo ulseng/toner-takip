@@ -11,7 +11,7 @@ interface LayoutProps {
   toggleTheme: () => void;
 }
 
-const APP_VERSION = "v0.010";
+const APP_VERSION = "v1.006";
 
 export const Layout: React.FC<LayoutProps> = ({ 
   children, activeTab, setActiveTab, onLogout, user, isDarkMode, toggleTheme 

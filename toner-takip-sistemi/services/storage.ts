@@ -16,7 +16,9 @@ const INITIAL_CONFIG: SystemConfig = {
   models: ['MF416dw', 'iF1643', 'LBP 251DW', '3325i', 'L3210', 'L1210', 'P2035', 'LBP 6030'],
   suppliers: ['Anahtar Bilgisayar', 'Enes Bilişim', 'Kendi Malımız'],
   tonerModels: ['1643', '505', '259x'],
-  whatsappNumber: ''
+  whatsappNumber: '',
+  brandImages: {},
+  modelImages: {}
 };
 
 // Helper to handle Firestore errors
@@ -177,7 +179,9 @@ export const StorageService = {
       const docSnap = await getDoc(docRef);
 
       if (docSnap.exists()) {
-        return docSnap.data() as SystemConfig;
+        const data = docSnap.data() as SystemConfig;
+        // Merge with initial defaults to ensure new fields exist
+        return { ...INITIAL_CONFIG, ...data };
       } else {
         await setDoc(docRef, INITIAL_CONFIG);
         return INITIAL_CONFIG;
