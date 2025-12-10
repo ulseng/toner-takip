@@ -11,7 +11,7 @@ interface LayoutProps {
   toggleTheme: () => void;
 }
 
-const APP_VERSION = "v0.003";
+const APP_VERSION = "v0.010";
 
 export const Layout: React.FC<LayoutProps> = ({ 
   children, activeTab, setActiveTab, onLogout, user, isDarkMode, toggleTheme 
@@ -33,98 +33,125 @@ export const Layout: React.FC<LayoutProps> = ({
   };
 
   return (
-    <div className="h-full flex flex-col md:flex-row bg-slate-50 dark:bg-slate-900 transition-colors duration-200 overflow-hidden fixed inset-0">
+    <div className="h-full flex flex-col md:flex-row bg-zinc-50 dark:bg-black transition-colors duration-300 overflow-hidden fixed inset-0 font-sans">
       
-      {/* Mobile Header - Flex None (Fixed height) */}
-      <div className="flex-none md:hidden bg-primary-800 text-white p-4 flex justify-between items-center shadow-md z-50">
+      {/* Mobile Header - Gradient */}
+      <div className="flex-none md:hidden bg-gradient-to-r from-zinc-900 to-zinc-800 text-white p-4 flex justify-between items-center shadow-lg shadow-emerald-900/10 z-50 border-b border-zinc-800">
         <div className="flex items-center gap-2">
-          <div className="bg-white/10 p-1.5 rounded-lg shadow-inner">
-             <Printer size={20} className="text-primary-100" />
+          <div className="bg-gradient-to-br from-emerald-500 to-teal-600 p-1.5 rounded-lg shadow-lg shadow-emerald-500/20">
+             <Printer size={20} className="text-white" />
           </div>
-          <h1 className="text-xl font-bold">Toner Takip</h1>
+          <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 to-teal-300">Toner Takip</h1>
         </div>
-        <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
+        <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="text-zinc-300 hover:text-white">
           {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
         </button>
       </div>
 
-      {/* Sidebar (Desktop) / Drawer (Mobile) */}
+      {/* Sidebar (Desktop) / Drawer (Mobile) - Dark & Green Theme */}
       <aside className={`
-        fixed md:static inset-y-0 left-0 z-40 w-64 bg-primary-900 text-primary-50 transform transition-transform duration-200 ease-in-out h-full flex flex-col shadow-xl
+        fixed md:static inset-y-0 left-0 z-40 w-64 bg-zinc-900 text-zinc-100 transform transition-transform duration-300 ease-in-out h-full flex flex-col shadow-2xl border-r border-zinc-800
         ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
         md:translate-x-0
       `}>
-        <div className="p-6 hidden md:block border-b border-primary-800">
+        {/* Logo Section */}
+        <div className="p-6 hidden md:block border-b border-zinc-800 bg-zinc-900">
           <div className="flex items-center gap-3 mb-1">
-             <div className="bg-white/10 p-2 rounded-xl shadow-inner text-primary-200">
+             <div className="bg-gradient-to-br from-emerald-500 to-teal-600 p-2.5 rounded-xl shadow-lg shadow-emerald-500/20 text-white">
                 <Printer size={28} />
              </div>
-             <h1 className="text-2xl font-bold text-white">Toner<br/><span className="text-primary-300 text-lg font-medium">Takip</span></h1>
+             <h1 className="text-2xl font-bold text-white tracking-tight">Toner<br/>
+             <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-400 text-lg font-medium">Sistemi</span></h1>
           </div>
-          <p className="text-xs text-primary-400 mt-2 ml-1">Sürüm: {APP_VERSION}</p>
+          <p className="text-[10px] text-zinc-500 mt-3 ml-1 uppercase tracking-widest font-semibold">Sürüm: {APP_VERSION}</p>
         </div>
 
-        <div className="p-4 bg-primary-800 md:hidden">
-          <p className="text-sm text-primary-200">Hoşgeldin,</p>
-          <p className="font-semibold text-white">{user.name}</p>
+        {/* Mobile User Info */}
+        <div className="p-4 bg-zinc-800 md:hidden border-b border-zinc-700">
+          <p className="text-xs text-zinc-400">Giriş Yapıldı:</p>
+          <p className="font-semibold text-emerald-400">{user.name}</p>
         </div>
 
-        <nav className="flex-1 px-2 py-4 space-y-2 overflow-y-auto">
+        {/* Navigation */}
+        <nav className="flex-1 px-3 py-6 space-y-2 overflow-y-auto">
           {navItems.map((item) => (
             <button
               key={item.id}
               onClick={() => handleNavClick(item.id)}
-              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${
+              className={`w-full flex items-center space-x-3 px-4 py-3.5 rounded-xl transition-all duration-200 group relative overflow-hidden ${
                 activeTab === item.id 
-                  ? 'bg-primary-700 text-white shadow-lg border border-primary-600' 
-                  : 'text-primary-100 hover:bg-primary-800 hover:text-white'
+                  ? 'text-white shadow-lg shadow-emerald-900/20' 
+                  : 'text-zinc-400 hover:bg-zinc-800 hover:text-white'
               }`}
             >
-              <item.icon size={20} />
-              <span>{item.label}</span>
+              {/* Active Tab Background Gradient */}
+              {activeTab === item.id && (
+                  <div className="absolute inset-0 bg-gradient-to-r from-emerald-600 to-teal-700 opacity-90"></div>
+              )}
+              
+              <div className="relative z-10 flex items-center gap-3">
+                  <item.icon size={20} className={activeTab === item.id ? 'text-white' : 'group-hover:text-emerald-400 transition-colors'} />
+                  <span className="font-medium tracking-wide">{item.label}</span>
+              </div>
             </button>
           ))}
         </nav>
 
-        <div className="p-4 border-t border-primary-800 space-y-3 bg-primary-900">
-           <div className="hidden md:block px-2">
-            <p className="text-xs text-primary-300">Kullanıcı</p>
-            <p className="font-medium text-sm truncate text-white">{user.name}</p>
+        {/* Bottom Actions */}
+        <div className="p-4 border-t border-zinc-800 space-y-3 bg-zinc-900">
+           <div className="hidden md:block px-2 mb-2">
+            <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-zinc-700 to-zinc-600 flex items-center justify-center text-xs font-bold text-white">
+                    {user.name.charAt(0)}
+                </div>
+                <div className="overflow-hidden">
+                    <p className="text-xs text-zinc-500">Kullanıcı</p>
+                    <p className="font-medium text-sm truncate text-zinc-200">{user.name}</p>
+                </div>
+            </div>
           </div>
           
           <button
             onClick={toggleTheme}
-            className="w-full flex items-center space-x-3 px-4 py-2 text-primary-100 hover:bg-primary-800 rounded-lg transition-colors"
+            className="w-full flex items-center space-x-3 px-4 py-2.5 text-zinc-400 hover:bg-zinc-800 hover:text-emerald-400 rounded-xl transition-colors"
           >
-            {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
-            <span>{isDarkMode ? 'Aydınlık Mod' : 'Karanlık Mod'}</span>
+            {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
+            <span className="text-sm">{isDarkMode ? 'Aydınlık Mod' : 'Karanlık Mod'}</span>
           </button>
 
           <button
             onClick={onLogout}
-            className="w-full flex items-center space-x-3 px-4 py-2 text-red-300 hover:bg-red-900/30 rounded-lg transition-colors"
+            className="w-full flex items-center space-x-3 px-4 py-2.5 text-red-400 hover:bg-red-900/20 rounded-xl transition-colors"
           >
-            <LogOut size={20} />
-            <span>Çıkış Yap</span>
+            <LogOut size={18} />
+            <span className="text-sm">Çıkış Yap</span>
           </button>
         </div>
       </aside>
 
-      {/* Main Content Area - Flex 1 (Takes remaining space) */}
-      <main className="flex-1 flex flex-col relative overflow-hidden bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 h-full">
+      {/* Main Content Area */}
+      <main className="flex-1 flex flex-col relative overflow-hidden bg-zinc-50 dark:bg-black text-zinc-900 dark:text-zinc-100 h-full">
         
         {/* Scrollable Content Container */}
         <div className="flex-1 overflow-y-auto p-4 md:p-8 scroll-smooth w-full h-full pb-20 md:pb-8">
-          <div className="max-w-5xl mx-auto min-h-full flex flex-col">
-            <div className="flex-1">
+          <div className="max-w-6xl mx-auto min-h-full flex flex-col">
+            <div className="flex-1 animate-in fade-in duration-500 slide-in-from-bottom-2">
               {children}
             </div>
             
-            {/* Footer with Version - Always at bottom of content */}
-            <footer className="mt-8 py-4 text-center border-t border-slate-200 dark:border-slate-800">
-              <p className="text-[10px] text-slate-400 font-mono tracking-widest uppercase">
-                Toner Takip Sistemi <span className="text-primary-500 font-bold ml-1">{APP_VERSION}</span>
-              </p>
+            {/* COPYRIGHT FOOTER - ALWAYS VISIBLE */}
+            <footer className="mt-12 py-6 text-center border-t border-zinc-200 dark:border-zinc-800">
+              <div className="flex flex-col items-center justify-center gap-1 opacity-60 hover:opacity-100 transition-opacity">
+                  <p className="text-[10px] text-zinc-400 font-mono tracking-[0.2em] uppercase">
+                    Toner Takip Sistemi
+                  </p>
+                  <p className="text-xs text-emerald-600 dark:text-emerald-500 font-semibold tracking-wide">
+                    Designed by Batuhan Yontuç
+                  </p>
+                  <p className="text-[9px] text-zinc-300 dark:text-zinc-700 mt-1">
+                      {APP_VERSION} &copy; {new Date().getFullYear()}
+                  </p>
+              </div>
             </footer>
           </div>
         </div>
@@ -133,7 +160,7 @@ export const Layout: React.FC<LayoutProps> = ({
       {/* Mobile Overlay */}
       {isMobileMenuOpen && (
         <div 
-          className="fixed inset-0 bg-black/50 z-30 md:hidden"
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-30 md:hidden animate-in fade-in duration-200"
           onClick={() => setIsMobileMenuOpen(false)}
         />
       )}

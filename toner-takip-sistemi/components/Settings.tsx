@@ -26,6 +26,18 @@ export const Settings: React.FC = () => {
     loadData();
   }, []);
 
+  // --- ESC KEY LISTENER ---
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (editModal) setEditModal(null);
+        if (deleteModal) setDeleteModal(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [editModal, deleteModal]);
+
   const loadData = async () => {
     setLoading(true);
     const c = await StorageService.getConfig();
