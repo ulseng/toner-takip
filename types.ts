@@ -1,3 +1,4 @@
+
 export interface User {
   username: string;
   name: string;
@@ -23,6 +24,7 @@ export interface Printer {
   ipAddress?: string; // Only if Network
   supplier: string; // e.g. "Anahtar Bilgisayar", "Enes Bilişim"
   status: PrinterStatus; // New Visual Status
+  connectedUsers?: string[]; // New: List of users connected to this printer
 }
 
 export interface TonerStock {

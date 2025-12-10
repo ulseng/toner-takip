@@ -23,11 +23,8 @@ export const StockManagement: React.FC<StockManagementProps> = ({ user }) => {
   const [cost, setCost] = useState(0); 
   const [newStockModel, setNewStockModel] = useState(''); 
   const [description, setDescription] = useState('');
+  const [customDate, setCustomDate] = useState(new Date().toISOString().split('T')[0]); // Default today YYYY-MM-DD
   
-  // Page Yield Logic
-  const [currentCounter, setCurrentCounter] = useState<number>(0);
-  const [lastPrinterCounter, setLastPrinterCounter] = useState<number>(0);
-
   // Notification
   const [message, setMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
 
@@ -48,6 +45,8 @@ export const StockManagement: React.FC<StockManagementProps> = ({ user }) => {
     setLogs(l);
     setConfig(c);
     setLoading(false);
+    // Reset date to today on refresh just in case
+    setCustomDate(new Date().toISOString().split('T')[0]);
   };
 
   const showMessage = (type: 'success' | 'error', text: string) => {
@@ -57,7 +56,6 @@ export const StockManagement: React.FC<StockManagementProps> = ({ user }) => {
 
   const checkLowStockAndNotify = (model: string, newQty: number) => {
     if (newQty <= 1) {
-       // Config is already loaded in state, no need to fetch again for this
        if (config.whatsappNumber) {
          setTimeout(() => {
             alert(`⚠️ SİSTEM UYARISI: ${model} toneri kritik seviyeye (${newQty}) düştü! WhatsApp bildirimi ${config.whatsappNumber} numarasına gönderildi.`);
@@ -74,16 +72,13 @@ export const StockManagement: React.FC<StockManagementProps> = ({ user }) => {
       return;
     }
 
-    // Calc new quantity
     const existingStock = stocks.find(s => s.modelName === model);
     const newQty = (existingStock ? existingStock.quantity : 0) + quantity;
 
-    // Save Stock (Async)
     await StorageService.saveStock({ modelName: model, quantity: newQty });
     
-    // Log
     const log: StockLog = {
-      id: Date.now().toString(), // Will be overwritten by DB ID but kept for type safety
+      id: Date.now().toString(),
       date: new Date().toISOString(),
       type: 'IN',
       tonerModel: model,
@@ -109,7 +104,6 @@ export const StockManagement: React.FC<StockManagementProps> = ({ user }) => {
       return;
     }
     
-    // Check stock locally first
     const stock = stocks.find(s => s.modelName === selectedTonerModel);
 
     if (!stock || stock.quantity < 1) {
@@ -117,81 +111,66 @@ export const StockManagement: React.FC<StockManagementProps> = ({ user }) => {
       return;
     }
 
-    // Decrement Stock
+    const now = new Date();
+    const logDate = new Date(customDate);
+    logDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
+    const isoLogDate = logDate.toISOString();
+
     const newQuantity = stock.quantity - 1;
     await StorageService.saveStock({ modelName: selectedTonerModel, quantity: newQuantity });
     
-    // Check Notification
     checkLowStockAndNotify(selectedTonerModel, newQuantity);
 
-    // Update Printer & Calculate Yield
     let printerDesc = "";
-    let calculatedYield = 0;
 
     if (selectedPrinterId && selectedPrinterId !== 'MANUAL') {
       const printer = printers.find(p => p.id === selectedPrinterId);
       if (printer) {
          printerDesc = `${printer.location} (${printer.floor})`;
-         if (currentCounter > printer.lastCounter) {
-             calculatedYield = currentCounter - printer.lastCounter;
-         }
-         
+         const isNewerDate = isoLogDate > printer.lastTonerDate;
          const updatedPrinter = {
             ...printer,
-            lastTonerDate: new Date().toISOString(),
-            lastCounter: currentCounter || printer.lastCounter
+            lastTonerDate: isNewerDate ? isoLogDate : printer.lastTonerDate
          };
          await StorageService.updatePrinter(updatedPrinter);
       }
     }
 
-    // Log
     const log: StockLog = {
       id: '',
-      date: new Date().toISOString(),
+      date: isoLogDate,
       type: 'OUT',
       tonerModel: selectedTonerModel,
       quantity: 1,
       printerId: selectedPrinterId === 'MANUAL' ? undefined : selectedPrinterId,
       description: (selectedPrinterId && selectedPrinterId !== 'MANUAL') ? `Yazıcıya Takıldı: ${printerDesc}` : `Stok Çıkışı: ${description}`,
-      user: user.name,
-      pageYield: calculatedYield > 0 ? calculatedYield : undefined
+      user: user.name
     };
     await StorageService.addLog(log);
 
     await refreshData();
-    showMessage('success', `${selectedTonerModel} stoktan düşüldü. ${calculatedYield > 0 ? `(Önceki toner: ${calculatedYield} sayfa)` : ''}`);
+    showMessage('success', `${selectedTonerModel} stoktan düşüldü.`);
     setSelectedPrinterId('');
     setSelectedTonerModel('');
-    setCurrentCounter(0);
     setActiveTab('LIST');
   };
 
-  // Helper to auto-select toner when printer is selected
   const onPrinterSelect = (printerId: string) => {
     setSelectedPrinterId(printerId);
     const printer = printers.find(p => p.id === printerId);
     if (printer) {
       if (printer.compatibleToner) setSelectedTonerModel(printer.compatibleToner);
-      setLastPrinterCounter(printer.lastCounter);
-      setCurrentCounter(printer.lastCounter); // Set default to current to avoid confusion
-    } else {
-       setLastPrinterCounter(0);
-       setCurrentCounter(0);
     }
   };
 
-  // WhatsApp Order Generator
   const sendWhatsappOrder = (model: string) => {
      const text = `Merhaba, ${model} model toner stoğumuz kritik seviyenin altına düştü. Sipariş vermek istiyoruz.`;
      const url = `https://wa.me/${config.whatsappNumber}?text=${encodeURIComponent(text)}`;
      window.open(url, '_blank');
   };
 
-  // Filter only OUT logs for the table
   const outputLogs = logs.filter(l => l.type === 'OUT');
 
-  // Printer Status Helper
   const getPrinterStatusText = (status: string) => {
     switch(status) {
       case 'ACTIVE': return 'Aktif';
@@ -210,21 +189,21 @@ export const StockManagement: React.FC<StockManagementProps> = ({ user }) => {
   return (
     <div className="space-y-6">
       {message && (
-        <div className={`fixed top-4 right-4 p-4 rounded-lg shadow-xl text-white z-50 animate-bounce ${message.type === 'success' ? 'bg-green-600' : 'bg-red-600'}`}>
+        <div className={`fixed top-4 right-4 p-4 rounded-lg shadow-xl text-white z-50 animate-bounce ${message.type === 'success' ? 'bg-emerald-600' : 'bg-red-600'}`}>
           {message.text}
         </div>
       )}
 
-      <div className="flex space-x-2 bg-white dark:bg-slate-800 p-1 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 w-fit">
+      <div className="flex space-x-2 bg-white dark:bg-zinc-900 p-1 rounded-xl shadow-sm border border-zinc-200 dark:border-zinc-800 w-fit">
         <button 
           onClick={() => setActiveTab('LIST')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'LIST' ? 'bg-primary-900 text-white' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'LIST' ? 'bg-zinc-900 dark:bg-zinc-700 text-white' : 'text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}
         >
           Stok Listesi
         </button>
         <button 
           onClick={() => setActiveTab('IN')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${activeTab === 'IN' ? 'bg-green-600 text-white' : 'text-green-700 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20'}`}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${activeTab === 'IN' ? 'bg-emerald-600 text-white' : 'text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'}`}
         >
           <ArrowDown size={16} /> Stok Giriş
         </button>
@@ -239,9 +218,9 @@ export const StockManagement: React.FC<StockManagementProps> = ({ user }) => {
       {activeTab === 'LIST' && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {stocks.map(stock => (
-            <div key={stock.modelName} className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col items-center justify-center text-center relative group hover:border-primary-300 transition-colors">
-              <h3 className="text-3xl font-bold text-slate-800 dark:text-white mb-1">{stock.quantity}</h3>
-              <p className="text-slate-500 dark:text-slate-400 font-medium">Model: {stock.modelName}</p>
+            <div key={stock.modelName} className="bg-white dark:bg-zinc-900 p-6 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm flex flex-col items-center justify-center text-center relative group hover:border-emerald-500/50 transition-colors">
+              <h3 className="text-3xl font-bold text-zinc-800 dark:text-white mb-1">{stock.quantity}</h3>
+              <p className="text-zinc-500 dark:text-zinc-400 font-medium">Model: {stock.modelName}</p>
               
               {stock.quantity < 3 && (
                  <div className="mt-2 flex flex-col gap-2 w-full">
@@ -251,7 +230,7 @@ export const StockManagement: React.FC<StockManagementProps> = ({ user }) => {
                     {config.whatsappNumber && (
                         <button 
                           onClick={() => sendWhatsappOrder(stock.modelName)}
-                          className="text-xs bg-green-500 text-white px-2 py-1.5 rounded-lg flex items-center justify-center gap-1 hover:bg-green-600"
+                          className="text-xs bg-emerald-500 text-white px-2 py-1.5 rounded-lg flex items-center justify-center gap-1 hover:bg-emerald-600"
                         >
                             <MessageCircle size={12} /> Sipariş Ver
                         </button>
@@ -261,71 +240,71 @@ export const StockManagement: React.FC<StockManagementProps> = ({ user }) => {
             </div>
           ))}
           {stocks.length === 0 && (
-            <div className="col-span-full p-8 text-center text-slate-400">Henüz stok kaydı yok.</div>
+            <div className="col-span-full p-8 text-center text-zinc-400">Henüz stok kaydı yok.</div>
           )}
         </div>
       )}
 
       {activeTab === 'IN' && (
-        <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 max-w-lg">
-          <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
-            <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg text-green-700 dark:text-green-400"><ArrowDown size={20}/></div>
+        <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl shadow-sm border border-zinc-200 dark:border-zinc-800 max-w-lg">
+          <h3 className="text-lg font-bold text-zinc-800 dark:text-white mb-4 flex items-center gap-2">
+            <div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg text-emerald-700 dark:text-emerald-400"><ArrowDown size={20}/></div>
             Stok Girişi Yap
           </h3>
           <form onSubmit={handleStockIn} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Toner/Mürekkep Modeli</label>
+              <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Toner/Mürekkep Modeli</label>
               <div className="relative">
                  <select 
                     required
-                    className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-green-500 outline-none bg-white dark:bg-slate-700 text-slate-900 dark:text-white appearance-none"
+                    className="w-full p-3 border border-zinc-300 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white appearance-none"
                     value={newStockModel}
                     onChange={e => setNewStockModel(e.target.value)}
                  >
                     <option value="">Listeden Seçiniz</option>
                     {config.tonerModels?.map(s => <option key={s} value={s}>{s}</option>)}
                  </select>
-                 <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">▼</div>
+                 <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-400">▼</div>
               </div>
-              <p className="text-xs text-slate-400 mt-2 flex items-center gap-1">
+              <p className="text-xs text-zinc-400 mt-2 flex items-center gap-1">
                 <SettingsIcon size={12} /> Listede olmayan modelleri "Ayarlar" sayfasından ekleyebilirsiniz.
               </p>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Adet</label>
+              <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Adet</label>
               <div className="flex items-center gap-4">
-                <button type="button" onClick={() => setQuantity(Math.max(1, quantity - 1))} className="p-3 bg-slate-100 dark:bg-slate-700 rounded-lg font-bold text-slate-700 dark:text-white">-</button>
+                <button type="button" onClick={() => setQuantity(Math.max(1, quantity - 1))} className="p-3 bg-zinc-100 dark:bg-zinc-700 rounded-lg font-bold text-zinc-700 dark:text-white">-</button>
                 <input 
                   type="number" 
                   min="1"
                   required
-                  className="w-full text-center p-3 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-green-500 outline-none font-bold text-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+                  className="w-full text-center p-3 border border-zinc-300 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none font-bold text-lg bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white"
                   value={quantity}
                   onChange={e => setQuantity(parseInt(e.target.value) || 1)}
                 />
-                <button type="button" onClick={() => setQuantity(quantity + 1)} className="p-3 bg-slate-100 dark:bg-slate-700 rounded-lg font-bold text-slate-700 dark:text-white">+</button>
+                <button type="button" onClick={() => setQuantity(quantity + 1)} className="p-3 bg-zinc-100 dark:bg-zinc-700 rounded-lg font-bold text-zinc-700 dark:text-white">+</button>
               </div>
             </div>
 
              <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+              <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
                  Toplam Maliyet (TL) 
-                 <span className="text-xs font-normal text-slate-400 ml-1">(Ücretsizse 0 giriniz)</span>
+                 <span className="text-xs font-normal text-zinc-400 ml-1">(Ücretsizse 0 giriniz)</span>
               </label>
               <div className="relative">
-                 <Banknote className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                 <Banknote className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={18} />
                  <input 
                    type="number" 
                    min="0"
-                   className="w-full pl-10 p-3 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-green-500 outline-none bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+                   className="w-full pl-10 p-3 border border-zinc-300 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white"
                    value={cost}
                    onChange={e => setCost(parseFloat(e.target.value) || 0)}
                  />
               </div>
             </div>
 
-            <button type="submit" className="w-full py-4 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 transition-colors shadow-lg shadow-green-200 dark:shadow-none">
+            <button type="submit" className="w-full py-4 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-500/20">
               Stok Ekle
             </button>
           </form>
@@ -334,16 +313,35 @@ export const StockManagement: React.FC<StockManagementProps> = ({ user }) => {
 
       {activeTab === 'OUT' && (
         <div className="flex flex-col lg:flex-row gap-6">
-          <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 w-full lg:w-1/2">
-             <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+          <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl shadow-sm border border-zinc-200 dark:border-zinc-800 w-full lg:w-1/2">
+             <h3 className="text-lg font-bold text-zinc-800 dark:text-white mb-4 flex items-center gap-2">
               <div className="p-2 bg-orange-100 dark:bg-orange-900/30 rounded-lg text-orange-700 dark:text-orange-400"><ArrowUp size={20}/></div>
               Toner Çıkışı (Değişim)
             </h3>
             <form onSubmit={handleStockOut} className="space-y-5">
+              
+              {/* DATE SELECTOR */}
               <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Hangi Yazıcıya?</label>
+                 <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">İşlem Tarihi</label>
+                 <div className="relative cursor-pointer" onClick={() => (document.getElementById('date-picker') as HTMLInputElement)?.showPicker()}>
+                     <Calendar size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none" />
+                     <input 
+                        id="date-picker"
+                        type="date" 
+                        required
+                        className="w-full pl-10 p-3 border border-zinc-300 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white cursor-pointer"
+                        value={customDate}
+                        onChange={e => setCustomDate(e.target.value)}
+                        onClick={(e) => e.currentTarget.showPicker()}
+                     />
+                 </div>
+                 <p className="text-[10px] text-zinc-400 mt-1 ml-1">Kutunun herhangi bir yerine tıklayarak takvimi açabilirsiniz.</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Hangi Yazıcıya?</label>
                 <select 
-                  className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+                  className="w-full p-3 border border-zinc-300 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white"
                   value={selectedPrinterId}
                   onChange={(e) => onPrinterSelect(e.target.value)}
                 >
@@ -357,34 +355,11 @@ export const StockManagement: React.FC<StockManagementProps> = ({ user }) => {
                 </select>
               </div>
 
-              {selectedPrinterId && selectedPrinterId !== 'MANUAL' && (
-                 <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl border border-blue-100 dark:border-blue-800/50">
-                     <label className="block text-sm font-bold text-blue-800 dark:text-blue-300 mb-2 flex items-center gap-2">
-                        <PrinterIcon size={16} /> GÜNCEL SAYAÇ (ZORUNLU)
-                     </label>
-                     <p className="text-xs text-blue-600 dark:text-blue-400 mb-2">Eski sayaç: {lastPrinterCounter}</p>
-                     <input 
-                        type="number" 
-                        required
-                        min={lastPrinterCounter}
-                        className="w-full p-3 border border-blue-300 dark:border-blue-600 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono text-lg"
-                        placeholder="Örn: 10500"
-                        value={currentCounter}
-                        onChange={e => setCurrentCounter(parseInt(e.target.value))}
-                     />
-                     {currentCounter > lastPrinterCounter && (
-                         <p className="text-xs text-green-600 dark:text-green-400 mt-2 font-bold">
-                            Bu toner ile basılan sayfa: {currentCounter - lastPrinterCounter}
-                         </p>
-                     )}
-                 </div>
-              )}
-
               {selectedPrinterId === 'MANUAL' && (
                  <div>
-                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Açıklama / Yer</label>
+                 <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Açıklama / Yer</label>
                  <input 
-                   className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+                   className="w-full p-3 border border-zinc-300 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white"
                    placeholder="Örn: 3. Kat Depo"
                    value={description}
                    onChange={e => setDescription(e.target.value)}
@@ -394,10 +369,10 @@ export const StockManagement: React.FC<StockManagementProps> = ({ user }) => {
               )}
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Verilen Toner Modeli</label>
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Verilen Toner Modeli</label>
                 <select 
                   required
-                  className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+                  className="w-full p-3 border border-zinc-300 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white"
                   value={selectedTonerModel}
                   onChange={e => setSelectedTonerModel(e.target.value)}
                 >
@@ -413,43 +388,41 @@ export const StockManagement: React.FC<StockManagementProps> = ({ user }) => {
               <div className="p-4 bg-orange-50 dark:bg-orange-900/20 rounded-xl text-sm text-orange-800 dark:text-orange-200 border border-orange-100 dark:border-orange-800/30">
                 <p>Onayladığınızda stoktan <strong>1 adet</strong> düşülecektir.</p>
                 {selectedPrinterId && selectedPrinterId !== 'MANUAL' && (
-                  <p className="mt-1">Sayaç güncellenecek ve <strong>verimlilik analizi</strong> kaydedilecektir.</p>
+                  <p className="mt-1">Cihazın "Son Toner Tarihi" güncellenecektir.</p>
                 )}
               </div>
 
-              <button type="submit" className="w-full py-4 bg-orange-600 text-white rounded-xl font-bold hover:bg-orange-700 transition-colors shadow-lg shadow-orange-200 dark:shadow-none">
+              <button type="submit" className="w-full py-4 bg-orange-600 text-white rounded-xl font-bold hover:bg-orange-700 transition-colors shadow-lg shadow-orange-500/20">
                 Çıkış Yap & Onayla
               </button>
             </form>
           </div>
           
-          {/* Recent Outputs Table - NEW FEATURE */}
+          {/* Recent Outputs Table */}
           <div className="w-full lg:w-1/2">
-             <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 h-full max-h-[600px] overflow-hidden flex flex-col">
-                <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
-                   <Calendar size={20} className="text-slate-500"/> Son Toner Çıkış Hareketleri
+             <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl shadow-sm border border-zinc-200 dark:border-zinc-800 h-full max-h-[600px] overflow-hidden flex flex-col">
+                <h3 className="text-lg font-bold text-zinc-800 dark:text-white mb-4 flex items-center gap-2">
+                   <Calendar size={20} className="text-zinc-500"/> Son Toner Çıkış Hareketleri
                 </h3>
                 <div className="overflow-y-auto flex-1">
                    <table className="w-full text-left text-sm">
-                      <thead className="bg-slate-50 dark:bg-slate-700 sticky top-0">
+                      <thead className="bg-zinc-50 dark:bg-zinc-800 sticky top-0">
                          <tr>
-                            <th className="p-3 text-slate-500 dark:text-slate-300 font-medium">Toner</th>
-                            <th className="p-3 text-slate-500 dark:text-slate-300 font-medium">Açıklama</th>
-                            <th className="p-3 text-slate-500 dark:text-slate-300 font-medium text-right">Verim</th>
+                            <th className="p-3 text-zinc-500 dark:text-zinc-400 font-medium">Toner</th>
+                            <th className="p-3 text-zinc-500 dark:text-zinc-400 font-medium">Tarih</th>
+                            <th className="p-3 text-zinc-500 dark:text-zinc-400 font-medium">Açıklama</th>
                          </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                      <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
                          {outputLogs.slice(0, 15).map(log => (
-                            <tr key={log.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
-                               <td className="p-3 font-medium text-slate-800 dark:text-white">{log.tonerModel}</td>
-                               <td className="p-3 text-slate-600 dark:text-slate-300 max-w-[150px] truncate" title={log.description}>{log.description}</td>
-                               <td className="p-3 text-right text-xs">
-                                  {log.pageYield ? <span className="text-green-600 font-bold">{log.pageYield} sf</span> : <span className="text-slate-400">-</span>}
-                               </td>
+                            <tr key={log.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
+                               <td className="p-3 font-medium text-zinc-800 dark:text-white">{log.tonerModel}</td>
+                               <td className="p-3 text-xs text-zinc-500 dark:text-zinc-400">{new Date(log.date).toLocaleDateString('tr-TR')}</td>
+                               <td className="p-3 text-zinc-600 dark:text-zinc-300 max-w-[120px] truncate" title={log.description}>{log.description}</td>
                             </tr>
                          ))}
                          {outputLogs.length === 0 && (
-                            <tr><td colSpan={3} className="p-4 text-center text-slate-400">Henüz çıkış kaydı yok.</td></tr>
+                            <tr><td colSpan={3} className="p-4 text-center text-zinc-400">Henüz çıkış kaydı yok.</td></tr>
                          )}
                       </tbody>
                    </table>
