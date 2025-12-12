@@ -57,6 +57,18 @@ export interface ServiceRecord {
   status: 'PENDING' | 'COMPLETED' | 'SCRAPPED'; // Bekliyor, Tamamlandı, Hurda
 }
 
+export interface CounterLog {
+  id: string;
+  printerId: string;
+  printerName: string;
+  serialNumber: string;
+  date: string; // YYYY-MM-DD format usually (the 15th of month)
+  previousCounter: number;
+  currentCounter: number;
+  usage: number; // current - previous
+  recordedBy: string; // User or "System Import"
+}
+
 export interface SystemConfig {
   brands: string[];
   models: string[];

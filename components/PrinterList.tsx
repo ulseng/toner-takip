@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, MapPin, Hash, Printer as PrinterIcon, Edit2, X, Wifi, Usb, Globe, Trash2, History, Truck, AlertTriangle, QrCode, FileSpreadsheet, Download, CheckCircle2, XCircle, AlertCircle, Archive, RefreshCw, Users, UserPlus, Filter, Wallet, Calendar, Database, ArrowRight } from 'lucide-react';
-import { Printer, SystemConfig, StockLog, ServiceRecord, PrinterStatus } from '../types';
+import { Plus, Search, MapPin, Hash, Printer as PrinterIcon, Edit2, X, Wifi, Usb, Globe, Trash2, History, Truck, AlertTriangle, QrCode, FileSpreadsheet, Download, CheckCircle2, XCircle, AlertCircle, Archive, RefreshCw, Users, UserPlus, Filter, Wallet, Calendar, Database, ArrowRight, Grid, Printer, ArrowUp, Loader2, Activity } from 'lucide-react';
+import { Printer as PrinterType, SystemConfig, StockLog, ServiceRecord, PrinterStatus } from '../types';
 import { StorageService } from '../services/storage';
 import { LoadingScreen } from './LoadingScreen';
 import { INITIAL_PRINTER_DATA } from './Settings';
 
 interface PrinterListProps {
-  onSelectPrinter?: (printer: Printer) => void;
+  onSelectPrinter?: (printer: PrinterType) => void;
   targetPrinterId?: string | null;
   clearTarget?: () => void;
 }
@@ -20,7 +20,7 @@ interface PrinterStats {
 }
 
 export const PrinterList: React.FC<PrinterListProps> = ({ onSelectPrinter, targetPrinterId, clearTarget }) => {
-  const [printers, setPrinters] = useState<Printer[]>([]);
+  const [printers, setPrinters] = useState<PrinterType[]>([]);
   const [config, setConfig] = useState<SystemConfig>({ brands: [], models: [], suppliers: [], tonerModels: [], brandImages: {}, modelImages: {} });
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
@@ -34,17 +34,21 @@ export const PrinterList: React.FC<PrinterListProps> = ({ onSelectPrinter, targe
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   
-  // QR Code Modal
-  const [qrPrinter, setQrPrinter] = useState<Printer | null>(null);
-
-  const [editingPrinter, setEditingPrinter] = useState<Printer | null>(null);
-  const [selectedPrinterHistory, setSelectedPrinterHistory] = useState<{printer: Printer, tonerLogs: StockLog[], serviceLogs: ServiceRecord[], stats: PrinterStats} | null>(null);
+  // Confirmation Modal State for Stock Out
+  const [showStockConfirmation, setShowStockConfirmation] = useState(false);
+  const [isProcessingStock, setIsProcessingStock] = useState(false);
+  
+  // QR Code Modal (Single)
+  const [qrPrinter, setQrPrinter] = useState<PrinterType | null>(null);
+  
+  const [editingPrinter, setEditingPrinter] = useState<PrinterType | null>(null);
+  const [selectedPrinterHistory, setSelectedPrinterHistory] = useState<{printer: PrinterType, tonerLogs: StockLog[], serviceLogs: ServiceRecord[], stats: PrinterStats} | null>(null);
 
   // Quick Import State
   const [isQuickImporting, setIsQuickImporting] = useState(false);
 
   // Form State
-  const [formData, setFormData] = useState<Partial<Printer>>({
+  const [formData, setFormData] = useState<Partial<PrinterType>>({
     brand: '',
     model: '',
     serialNumber: '',
@@ -81,7 +85,9 @@ export const PrinterList: React.FC<PrinterListProps> = ({ onSelectPrinter, targe
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (qrPrinter) {
+        if (showStockConfirmation) {
+            setShowStockConfirmation(false);
+        } else if (qrPrinter) {
           setQrPrinter(null);
         } else if (isHistoryModalOpen) {
           setIsHistoryModalOpen(false);
@@ -95,7 +101,7 @@ export const PrinterList: React.FC<PrinterListProps> = ({ onSelectPrinter, targe
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [qrPrinter, isHistoryModalOpen, isFormModalOpen, deleteId]);
+  }, [qrPrinter, isHistoryModalOpen, isFormModalOpen, deleteId, showStockConfirmation]);
 
   const loadData = async () => {
     setLoading(true);
@@ -149,7 +155,7 @@ export const PrinterList: React.FC<PrinterListProps> = ({ onSelectPrinter, targe
                 ipAddress = item.ip.length <= 3 ? `192.168.1.${item.ip}` : item.ip;
             }
 
-            const newPrinter: Printer = {
+            const newPrinter: PrinterType = {
                 id: '',
                 serialNumber: item.s,
                 brand: 'Canon',
@@ -192,20 +198,44 @@ export const PrinterList: React.FC<PrinterListProps> = ({ onSelectPrinter, targe
     }
   };
 
-  const handleEditClick = (e: React.MouseEvent, printer: Printer) => {
+  const handleEditClick = (e: React.MouseEvent, printer: PrinterType) => {
     e.preventDefault();
     e.stopPropagation();
     openFormModal(printer);
   };
 
-  const handleQrClick = (e: React.MouseEvent, printer: Printer) => {
+  const handleQrClick = (e: React.MouseEvent, printer: PrinterType) => {
     e.preventDefault();
     e.stopPropagation();
     setQrPrinter(printer);
   };
 
-  const handleHistoryClick = (printer: Printer) => {
+  const handleHistoryClick = (printer: PrinterType) => {
     openHistoryModal(printer);
+  };
+
+  // NEW: Handle quick status change from History Modal
+  const handleStatusChange = async (newStatus: PrinterStatus) => {
+    if (!selectedPrinterHistory) return;
+
+    const updatedPrinter = { ...selectedPrinterHistory.printer, status: newStatus };
+
+    // 1. Optimistic UI Update (Modal)
+    setSelectedPrinterHistory({
+        ...selectedPrinterHistory,
+        printer: updatedPrinter
+    });
+
+    // 2. Optimistic UI Update (List Background)
+    setPrinters(prev => prev.map(p => p.id === updatedPrinter.id ? updatedPrinter : p));
+
+    // 3. Persist to DB
+    try {
+        await StorageService.updatePrinter(updatedPrinter);
+    } catch (error) {
+        console.error("Status update failed", error);
+        alert("Durum güncellenemedi.");
+    }
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -221,14 +251,14 @@ export const PrinterList: React.FC<PrinterListProps> = ({ onSelectPrinter, targe
 
     if (editingPrinter && editingPrinter.id) {
        // Update
-       const updatedPrinter = { ...editingPrinter, ...finalData } as Printer;
+       const updatedPrinter = { ...editingPrinter, ...finalData } as PrinterType;
        await StorageService.updatePrinter(updatedPrinter);
     } else {
        // Create
-       const newPrinter: Printer = {
+       const newPrinter: PrinterType = {
         id: '', // Generated by Firestore
         lastTonerDate: new Date().toISOString(),
-        ...finalData as Printer,
+        ...finalData as PrinterType,
         status: finalData.status || 'ACTIVE'
        };
        await StorageService.addPrinter(newPrinter);
@@ -276,7 +306,7 @@ export const PrinterList: React.FC<PrinterListProps> = ({ onSelectPrinter, targe
 
   // --- MODAL HELPERS ---
 
-  const openFormModal = (printer?: Printer) => {
+  const openFormModal = (printer?: PrinterType) => {
     if (printer) {
       setEditingPrinter(printer);
       setFormData(printer);
@@ -307,7 +337,7 @@ export const PrinterList: React.FC<PrinterListProps> = ({ onSelectPrinter, targe
     setEditingPrinter(null);
   };
 
-  const openHistoryModal = async (printer: Printer) => {
+  const openHistoryModal = async (printer: PrinterType) => {
     // Fetch fresh logs for this specific history view
     const allLogs = await StorageService.getLogs();
     const allServices = await StorageService.getServiceRecords();
@@ -356,6 +386,83 @@ export const PrinterList: React.FC<PrinterListProps> = ({ onSelectPrinter, targe
     });
     setIsHistoryModalOpen(true);
   };
+
+  // Step 1: Check Availability and Show Modal
+  const handleInitiateQuickStockOut = async () => {
+      if (!selectedPrinterHistory) return;
+      const printer = selectedPrinterHistory.printer;
+
+      if (!printer.compatibleToner) {
+          alert("HATA: Bu yazıcı için tanımlı 'Uyumlu Toner' modeli yok. Lütfen önce cihazı düzenleyip toner modeli seçin.");
+          return;
+      }
+      
+      // Check stock availability BEFORE showing confirmation
+      const allStocks = await StorageService.getStocks();
+      const stockItem = allStocks.find(s => s.modelName === printer.compatibleToner);
+      
+      if (!stockItem || stockItem.quantity < 1) {
+          alert(`HATA: ${printer.compatibleToner} model tonerden stokta kalmamış!`);
+          return;
+      }
+
+      // If stock exists, show confirmation modal
+      setShowStockConfirmation(true);
+  };
+
+  // Step 2: Actually Perform Stock Out
+  const handleFinalizeStockOut = async () => {
+      if (!selectedPrinterHistory) return;
+      setIsProcessingStock(true);
+      
+      const printer = selectedPrinterHistory.printer;
+      
+      try {
+          // 1. Re-fetch stocks to be absolutely sure (concurrency check)
+          const allStocks = await StorageService.getStocks();
+          const stockItem = allStocks.find(s => s.modelName === printer.compatibleToner);
+
+          if (!stockItem || stockItem.quantity < 1) {
+              alert(`HATA: İşlem sırasında stok tükendi!`);
+              setIsProcessingStock(false);
+              setShowStockConfirmation(false);
+              return;
+          }
+
+          // 2. Decrement Stock
+          await StorageService.saveStock({ modelName: printer.compatibleToner, quantity: stockItem.quantity - 1 });
+
+          // 3. Update Printer Date
+          const updatedPrinter = { ...printer, lastTonerDate: new Date().toISOString() };
+          await StorageService.updatePrinter(updatedPrinter);
+
+          // 4. Create Log
+          const log: StockLog = {
+              id: '',
+              date: new Date().toISOString(),
+              type: 'OUT',
+              tonerModel: printer.compatibleToner,
+              quantity: 1,
+              printerId: printer.id,
+              description: `Yazıcıya Takıldı: ${printer.location} (${printer.floor}) [QR Hızlı İşlem]`,
+              user: 'Sistem (QR)'
+          };
+          await StorageService.addLog(log);
+
+          // Success Logic
+          setShowStockConfirmation(false);
+          setIsHistoryModalOpen(false); // Close main modal
+          loadData(); // Refresh main list
+          alert("İşlem Başarılı! Stok düşüldü ve cihaz güncellendi.");
+
+      } catch (e) {
+          console.error(e);
+          alert("Bir hata oluştu.");
+      } finally {
+          setIsProcessingStock(false);
+      }
+  };
+
 
   // FILTER LOGIC
   const uniqueFloors = ['ALL', ...Array.from(new Set(printers.map(p => p.floor))).filter(Boolean)];
@@ -793,21 +900,107 @@ export const PrinterList: React.FC<PrinterListProps> = ({ onSelectPrinter, targe
         </div>
        )}
 
-       {/* HISTORY MODAL WITH STATS */}
+       {/* HISTORY MODAL WITH STATS & CONFIRMATION OVERLAY */}
        {isHistoryModalOpen && selectedPrinterHistory && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-zinc-900 rounded-2xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
+          <div className="bg-white dark:bg-zinc-900 rounded-2xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200 relative overflow-hidden">
+            
+            {/* === STOCK CONFIRMATION OVERLAY === */}
+            {showStockConfirmation && (
+                <div className="absolute inset-0 z-[60] bg-white/95 dark:bg-zinc-900/95 flex items-center justify-center p-6 animate-in fade-in slide-in-from-bottom-4">
+                    <div className="w-full max-w-sm text-center">
+                        <div className="w-20 h-20 bg-orange-100 dark:bg-orange-900/30 text-orange-600 rounded-full flex items-center justify-center mx-auto mb-6 animate-pulse">
+                            <AlertTriangle size={40} />
+                        </div>
+                        <h3 className="text-2xl font-bold text-zinc-800 dark:text-white mb-2">Emin misiniz?</h3>
+                        <p className="text-zinc-500 dark:text-zinc-400 mb-6 text-sm leading-relaxed">
+                            <strong>{selectedPrinterHistory.printer.compatibleToner}</strong> model toner stoktan düşülecek ve
+                            bu cihazın son toner tarihi güncellenecek.
+                        </p>
+                        
+                        <div className="flex flex-col gap-3">
+                            <button 
+                                onClick={handleFinalizeStockOut}
+                                disabled={isProcessingStock}
+                                className="w-full py-4 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-bold shadow-lg shadow-orange-500/30 flex items-center justify-center gap-2 transition-all active:scale-95"
+                            >
+                                {isProcessingStock ? (
+                                    <>
+                                        <Loader2 size={20} className="animate-spin"/> İşleniyor...
+                                    </>
+                                ) : (
+                                    <>
+                                        <ArrowUp size={20}/> Evet, Stok Düş
+                                    </>
+                                )}
+                            </button>
+                            <button 
+                                onClick={() => setShowStockConfirmation(false)}
+                                disabled={isProcessingStock}
+                                className="w-full py-4 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 rounded-xl font-bold hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+                            >
+                                Vazgeç
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Modal Header */}
             <div className="p-6 border-b border-zinc-100 dark:border-zinc-800 flex justify-between items-start bg-zinc-50 dark:bg-zinc-900 rounded-t-2xl">
               <div>
                 <h3 className="text-xl font-bold text-zinc-800 dark:text-white">{selectedPrinterHistory.printer.brand} {selectedPrinterHistory.printer.model}</h3>
-                <p className="text-zinc-500 dark:text-zinc-400 text-sm mt-1">{selectedPrinterHistory.printer.location} - {selectedPrinterHistory.printer.serialNumber}</p>
+                <p className="text-zinc-500 dark:text-zinc-400 text-sm mt-1 mb-2">{selectedPrinterHistory.printer.location} - {selectedPrinterHistory.printer.serialNumber}</p>
+                
+                {/* --- QUICK STATUS CHANGER --- */}
+                <div className="flex items-center gap-2 mt-2">
+                    <span className="text-xs font-bold text-zinc-400 uppercase tracking-wide flex items-center gap-1">
+                        <Activity size={12}/> Durum:
+                    </span>
+                    <select
+                        className={`text-xs font-bold uppercase rounded px-2 py-1 outline-none border-none cursor-pointer
+                            ${selectedPrinterHistory.printer.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : ''}
+                            ${selectedPrinterHistory.printer.status === 'SPARE' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400' : ''}
+                            ${selectedPrinterHistory.printer.status === 'MAINTENANCE' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' : ''}
+                            ${selectedPrinterHistory.printer.status === 'BROKEN' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : ''}
+                            ${selectedPrinterHistory.printer.status === 'SCRAPPED' ? 'bg-zinc-200 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400' : ''}
+                        `}
+                        value={selectedPrinterHistory.printer.status}
+                        onChange={(e) => handleStatusChange(e.target.value as PrinterStatus)}
+                    >
+                        <option value="ACTIVE">🟢 Aktif</option>
+                        <option value="SPARE">📦 Yedekte</option>
+                        <option value="MAINTENANCE">🔧 Serviste</option>
+                        <option value="BROKEN">⚠️ Arızalı</option>
+                        <option value="SCRAPPED">❌ Hurda</option>
+                    </select>
+                </div>
+
               </div>
               <button onClick={() => setIsHistoryModalOpen(false)} className="p-2 bg-white dark:bg-zinc-800 rounded-full shadow-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"><X size={20} className="text-zinc-500"/></button>
             </div>
             
             <div className="overflow-y-auto p-6 space-y-8 custom-scrollbar">
                 
+                {/* --- QUICK ACTION: TONER OUT --- */}
+                <div className="bg-gradient-to-r from-orange-500 to-red-500 p-4 rounded-xl flex items-center justify-between text-white shadow-lg shadow-orange-500/20">
+                    <div>
+                        <h4 className="font-bold text-lg flex items-center gap-2"><ArrowUp size={20} className="text-white"/> Hızlı İşlem</h4>
+                        <p className="text-orange-100 text-sm">
+                             {selectedPrinterHistory.printer.compatibleToner ? 
+                                `${selectedPrinterHistory.printer.compatibleToner} toneri stoktan düş.` : 
+                                'Uyumlu toner tanımlı değil.'}
+                        </p>
+                    </div>
+                    <button 
+                        onClick={handleInitiateQuickStockOut}
+                        className="bg-white text-orange-600 px-4 py-2 rounded-lg font-bold hover:bg-orange-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                        disabled={!selectedPrinterHistory.printer.compatibleToner}
+                    >
+                        Hızlı Stok Düş
+                    </button>
+                </div>
+
                 {/* 1. SCORECARD (STATS) */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 p-4 rounded-xl border border-emerald-100 dark:border-emerald-800/30">
@@ -869,7 +1062,7 @@ export const PrinterList: React.FC<PrinterListProps> = ({ onSelectPrinter, targe
                         </div>
                         <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">{srv.issue}</p>
                         <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-1">İşlem: {srv.actionTaken}</p>
-                        <p className="text-[10px] text-zinc-400 mt-2 text-right">{srv.provider}</p>
+                        <p className="text-left text-[10px] text-zinc-400 mt-2">{srv.provider}</p>
                       </div>
                     ))}
                    </div>

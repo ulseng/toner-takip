@@ -1,6 +1,6 @@
 import { db } from './firebase';
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, setDoc, query, orderBy, getDoc } from 'firebase/firestore';
-import { Printer, TonerStock, StockLog, SystemConfig, ServiceRecord, User } from '../types';
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, setDoc, query, orderBy, getDoc, where } from 'firebase/firestore';
+import { Printer, TonerStock, StockLog, SystemConfig, ServiceRecord, User, CounterLog } from '../types';
 
 const COLLECTIONS = {
   PRINTERS: 'printers',
@@ -8,7 +8,8 @@ const COLLECTIONS = {
   LOGS: 'logs',
   CONFIG: 'config',
   SERVICES: 'services',
-  USERS: 'users'
+  USERS: 'users',
+  COUNTERS: 'counters'
 };
 
 const INITIAL_CONFIG: SystemConfig = {
@@ -169,6 +170,31 @@ export const StorageService = {
       await addDoc(collection(db, COLLECTIONS.SERVICES), data);
     } catch (e) {
       handleDbError(e, 'addServiceRecord');
+    }
+  },
+
+  // --- COUNTERS (NEW) ---
+  getCounterLogs: async (): Promise<CounterLog[]> => {
+    try {
+      const q = query(collection(db, COLLECTIONS.COUNTERS), orderBy('date', 'desc'));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as any } as CounterLog));
+    } catch (e) {
+      return [];
+    }
+  },
+
+  addCounterLog: async (log: CounterLog) => {
+    try {
+       // 1. Add Log
+       const { id, ...data } = log;
+       await addDoc(collection(db, COLLECTIONS.COUNTERS), data);
+
+       // 2. Update Printer's Last Counter
+       const printerRef = doc(db, COLLECTIONS.PRINTERS, log.printerId);
+       await updateDoc(printerRef, { lastCounter: log.currentCounter });
+    } catch (e) {
+      handleDbError(e, 'addCounterLog');
     }
   },
 
