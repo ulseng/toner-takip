@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Menu, X, Printer, Package, LogOut, LayoutDashboard, History, Settings, Moon, Sun, Wrench } from 'lucide-react';
+import { Menu, X, Printer, Package, LogOut, LayoutDashboard, History, Settings, Moon, Sun, Wrench, QrCode, ScanLine } from 'lucide-react';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -11,7 +11,7 @@ interface LayoutProps {
   toggleTheme: () => void;
 }
 
-const APP_VERSION = "v1.006";
+const APP_VERSION = "v2.003";
 
 export const Layout: React.FC<LayoutProps> = ({ 
   children, activeTab, setActiveTab, onLogout, user, isDarkMode, toggleTheme 
@@ -20,9 +20,11 @@ export const Layout: React.FC<LayoutProps> = ({
 
   const navItems = [
     { id: 'dashboard', label: 'Özet', icon: LayoutDashboard },
+    { id: 'scan', label: 'QR Oku', icon: ScanLine }, // New Scanner Tab
     { id: 'printers', label: 'Yazıcılar', icon: Printer },
     { id: 'service', label: 'Bakım & Servis', icon: Wrench },
     { id: 'stock', label: 'Stok Yönetimi', icon: Package },
+    { id: 'qr', label: 'QR Yönetimi', icon: QrCode },
     { id: 'history', label: 'Geçmiş', icon: History },
     { id: 'settings', label: 'Ayarlar', icon: Settings },
   ];

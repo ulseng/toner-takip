@@ -7,6 +7,8 @@ import { StockManagement } from './components/StockManagement';
 import { History } from './components/History';
 import { Settings } from './components/Settings';
 import { ServiceManagement } from './components/ServiceManagement';
+import { QrManagement } from './components/QrManagement';
+import { QrScanner } from './components/QrScanner';
 import { User } from './types';
 
 function App() {
@@ -82,9 +84,11 @@ function App() {
         toggleTheme={toggleTheme}
       >
         {activeTab === 'dashboard' && <Dashboard />}
+        {activeTab === 'scan' && <QrScanner />}
         {activeTab === 'printers' && <PrinterList targetPrinterId={targetPrinterId} clearTarget={() => setTargetPrinterId(null)} />}
         {activeTab === 'service' && <ServiceManagement />}
         {activeTab === 'stock' && <StockManagement user={user} />}
+        {activeTab === 'qr' && <QrManagement />}
         {activeTab === 'history' && <History />}
         {activeTab === 'settings' && <Settings />}
       </Layout>
