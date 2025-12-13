@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Menu, X, Printer, Package, LogOut, LayoutDashboard, History, Settings, Moon, Sun, Wrench, QrCode, ScanLine } from 'lucide-react';
+import { Menu, X, Printer, Package, LogOut, LayoutDashboard, History, Settings, Moon, Sun, Wrench, QrCode, ScanLine, Box } from 'lucide-react';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -20,8 +20,9 @@ export const Layout: React.FC<LayoutProps> = ({
 
   const navItems = [
     { id: 'dashboard', label: 'Özet', icon: LayoutDashboard },
-    { id: 'scan', label: 'QR Oku', icon: ScanLine }, // New Scanner Tab
+    { id: 'scan', label: 'QR Oku', icon: ScanLine },
     { id: 'printers', label: 'Yazıcılar', icon: Printer },
+    { id: 'inventory', label: 'Model Envanteri', icon: Box }, // NEW ITEM
     { id: 'service', label: 'Bakım & Servis', icon: Wrench },
     { id: 'stock', label: 'Stok Yönetimi', icon: Package },
     { id: 'qr', label: 'QR Yönetimi', icon: QrCode },
