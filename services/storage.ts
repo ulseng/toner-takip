@@ -184,15 +184,24 @@ export const StorageService = {
     }
   },
 
-  addCounterLog: async (log: CounterLog) => {
+  addCounterLog: async (log: CounterLog, updateMasterRecord: boolean = true) => {
     try {
        // 1. Add Log
        const { id, ...data } = log;
        await addDoc(collection(db, COLLECTIONS.COUNTERS), data);
 
-       // 2. Update Printer's Last Counter
-       const printerRef = doc(db, COLLECTIONS.PRINTERS, log.printerId);
-       await updateDoc(printerRef, { lastCounter: log.currentCounter });
+       // 2. Update Printer's Last Counter ONLY if requested
+       if (updateMasterRecord) {
+         const printerRef = doc(db, COLLECTIONS.PRINTERS, log.printerId);
+         
+         const updatePayload: any = { lastCounter: log.currentCounter };
+         
+         // Update sub-counters if available
+         if (log.currentBW !== undefined) updatePayload.lastCounterBW = log.currentBW;
+         if (log.currentColor !== undefined) updatePayload.lastCounterColor = log.currentColor;
+
+         await updateDoc(printerRef, updatePayload);
+       }
     } catch (e) {
       handleDbError(e, 'addCounterLog');
     }

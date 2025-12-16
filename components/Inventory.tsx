@@ -21,14 +21,28 @@ export const Inventory: React.FC = () => {
     loadData();
   }, []);
 
+  // --- HISTORY / BACK BUTTON HANDLER ---
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+        if (selectedModel) {
+            setSelectedModel(null);
+        }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [selectedModel]);
+
   // Close modal on ESC
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setSelectedModel(null);
+      if (e.key === 'Escape' && selectedModel) {
+          e.preventDefault(); // Stop other browser actions
+          window.history.back(); // Trigger popstate to close
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [selectedModel]);
 
   const loadData = async () => {
     setLoading(true);
@@ -55,6 +69,17 @@ export const Inventory: React.FC = () => {
     setModelGroups(groupArray);
     setConfig(sysConfig);
     setLoading(false);
+  };
+
+  const handleGroupClick = (group: ModelGroup) => {
+      // Push history state so back button works
+      window.history.pushState({ modal: 'modelDetail' }, '');
+      setSelectedModel(group);
+  };
+
+  // This function explicitly calls history back, which triggers the popstate listener
+  const closeModalViaBack = () => {
+      window.history.back();
   };
 
   const getStatusBadge = (status: string) => {
@@ -112,7 +137,7 @@ export const Inventory: React.FC = () => {
             return (
                <div 
                  key={group.modelName}
-                 onClick={() => setSelectedModel(group)}
+                 onClick={() => handleGroupClick(group)}
                  className="group bg-white dark:bg-zinc-900 rounded-2xl p-5 shadow-sm border border-zinc-200 dark:border-zinc-800 hover:shadow-xl hover:border-blue-400/50 dark:hover:border-blue-600/50 transition-all cursor-pointer relative overflow-hidden flex flex-col"
                >
                   {/* Background decoration */}
@@ -157,7 +182,7 @@ export const Inventory: React.FC = () => {
              {/* Backdrop */}
              <div 
                className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300"
-               onClick={() => setSelectedModel(null)}
+               onClick={closeModalViaBack}
              ></div>
 
              {/* Slide-over Panel */}
@@ -174,7 +199,7 @@ export const Inventory: React.FC = () => {
                         </p>
                      </div>
                      <button 
-                       onClick={() => setSelectedModel(null)}
+                       onClick={closeModalViaBack}
                        className="p-2 bg-white dark:bg-zinc-800 rounded-full hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors shadow-sm"
                      >
                         <X size={20} className="text-zinc-500"/>
@@ -214,7 +239,7 @@ export const Inventory: React.FC = () => {
                  {/* Footer */}
                  <div className="p-4 bg-white dark:bg-zinc-900 border-t border-zinc-100 dark:border-zinc-800">
                     <button 
-                      onClick={() => setSelectedModel(null)}
+                      onClick={closeModalViaBack}
                       className="w-full py-3 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-bold rounded-xl hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
                     >
                        Kapat
