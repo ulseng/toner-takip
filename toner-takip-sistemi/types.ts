@@ -17,7 +17,7 @@ export interface Printer {
   model: string;   // e.g. "3325i"
   location: string;
   floor: string;
-  lastCounter: number;
+  lastCounter: number; // Represents TOTAL counter
   lastTonerDate: string;
   compatibleToner: string;
   connectionType: ConnectionType;
@@ -25,6 +25,11 @@ export interface Printer {
   supplier: string; // e.g. "Anahtar Bilgisayar", "Enes Bilişim"
   status: PrinterStatus; // New Visual Status
   connectedUsers?: string[]; // New: List of users connected to this printer
+  
+  // New Fields for Multi-Counter
+  isColor?: boolean; // If true, enables A4-SB and A4-RL inputs
+  lastCounterBW?: number; // Last known Black&White counter
+  lastCounterColor?: number; // Last known Color counter
 }
 
 export interface TonerStock {
@@ -67,6 +72,15 @@ export interface CounterLog {
   currentCounter: number;
   usage: number; // current - previous
   recordedBy: string; // User or "System Import"
+  
+  // New Fields for Detail Logging
+  usageBW?: number;
+  usageColor?: number;
+  currentBW?: number;
+  currentColor?: number;
+  
+  // Advanced Dynamic Counters (e.g. A3 BW, A3 Color)
+  customCounters?: { label: string; value: number }[];
 }
 
 export interface SystemConfig {
