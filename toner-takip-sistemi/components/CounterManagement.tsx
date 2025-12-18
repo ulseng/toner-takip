@@ -239,7 +239,8 @@ export const CounterManagement: React.FC<CounterManagementProps> = ({ user }) =>
           const log: CounterLog = {
             id: '',
             printerId: printer.id,
-            printerName: `${printer.brand} ${printer.model}`,
+            // CAPTURE HISTORICAL LOCATION SNAPSHOT
+            printerName: `${printer.brand} ${printer.model} (${printer.location})`,
             serialNumber: printer.serialNumber,
             date: logDate.toISOString(),
             previousCounter: prevCounter,
@@ -266,7 +267,7 @@ export const CounterManagement: React.FC<CounterManagementProps> = ({ user }) =>
           fetchData(); 
       } catch (error) {
           console.error(error);
-          alert("Hata oluştu.");
+          alert("Hata oluştu: " + error);
       }
   };
 
@@ -296,7 +297,8 @@ export const CounterManagement: React.FC<CounterManagementProps> = ({ user }) =>
      const log: CounterLog = {
          id: '',
          printerId: printer.id,
-         printerName: `${printer.brand} ${printer.model}`,
+         // CAPTURE HISTORICAL LOCATION SNAPSHOT
+         printerName: `${printer.brand} ${printer.model} (${printer.location})`,
          serialNumber: printer.serialNumber,
          date: new Date().toISOString(),
          previousCounter: printer.lastCounter,
