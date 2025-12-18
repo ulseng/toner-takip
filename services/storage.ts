@@ -33,6 +33,18 @@ const handleDbError = (error: any, context: string) => {
   throw error;
 };
 
+// --- FIX: Helper to remove 'undefined' fields ---
+// Firestore crashes if a field is explicitly undefined. This removes those keys.
+const cleanData = (data: any) => {
+  const newObj = { ...data };
+  Object.keys(newObj).forEach(key => {
+    if (newObj[key] === undefined) {
+      delete newObj[key];
+    }
+  });
+  return newObj;
+};
+
 export const StorageService = {
   
   // --- AUTH ---
@@ -78,7 +90,7 @@ export const StorageService = {
   addPrinter: async (printer: Printer) => {
     try {
       const { id, ...data } = printer; 
-      const docRef = await addDoc(collection(db, COLLECTIONS.PRINTERS), data);
+      const docRef = await addDoc(collection(db, COLLECTIONS.PRINTERS), cleanData(data));
       return docRef.id;
     } catch (e) {
       handleDbError(e, 'addPrinter');
@@ -91,7 +103,7 @@ export const StorageService = {
     try {
       const printerRef = doc(db, COLLECTIONS.PRINTERS, printer.id);
       const { id, ...data } = printer;
-      await updateDoc(printerRef, data);
+      await updateDoc(printerRef, cleanData(data));
     } catch (e) {
       handleDbError(e, 'updatePrinter');
     }
@@ -125,7 +137,7 @@ export const StorageService = {
       if (existingDoc) {
         await updateDoc(doc(db, COLLECTIONS.STOCKS, existingDoc.id), { quantity: stock.quantity });
       } else {
-        await addDoc(collection(db, COLLECTIONS.STOCKS), stock);
+        await addDoc(collection(db, COLLECTIONS.STOCKS), cleanData(stock));
       }
     } catch (e) {
       handleDbError(e, 'saveStock');
@@ -147,7 +159,7 @@ export const StorageService = {
   addLog: async (log: StockLog) => {
     try {
       const { id, ...data } = log;
-      await addDoc(collection(db, COLLECTIONS.LOGS), data);
+      await addDoc(collection(db, COLLECTIONS.LOGS), cleanData(data));
     } catch (e) {
       handleDbError(e, 'addLog');
     }
@@ -167,7 +179,7 @@ export const StorageService = {
   addServiceRecord: async (record: ServiceRecord) => {
     try {
       const { id, ...data } = record;
-      await addDoc(collection(db, COLLECTIONS.SERVICES), data);
+      await addDoc(collection(db, COLLECTIONS.SERVICES), cleanData(data));
     } catch (e) {
       handleDbError(e, 'addServiceRecord');
     }
@@ -186,9 +198,10 @@ export const StorageService = {
 
   addCounterLog: async (log: CounterLog, updateMasterRecord: boolean = true) => {
     try {
-       // 1. Add Log
+       // 1. Add Log (Using cleanData to prevent undefined errors)
        const { id, ...data } = log;
-       await addDoc(collection(db, COLLECTIONS.COUNTERS), data);
+       const sanitizedData = cleanData(data);
+       await addDoc(collection(db, COLLECTIONS.COUNTERS), sanitizedData);
 
        // 2. Update Printer's Last Counter ONLY if requested
        if (updateMasterRecord) {
@@ -200,7 +213,7 @@ export const StorageService = {
          if (log.currentBW !== undefined) updatePayload.lastCounterBW = log.currentBW;
          if (log.currentColor !== undefined) updatePayload.lastCounterColor = log.currentColor;
 
-         await updateDoc(printerRef, updatePayload);
+         await updateDoc(printerRef, cleanData(updatePayload));
        }
     } catch (e) {
       handleDbError(e, 'addCounterLog');
@@ -229,7 +242,7 @@ export const StorageService = {
   saveConfig: async (config: SystemConfig) => {
     try {
       const docRef = doc(db, COLLECTIONS.CONFIG, 'main_config');
-      await setDoc(docRef, config);
+      await setDoc(docRef, cleanData(config));
     } catch (e) {
       handleDbError(e, 'saveConfig');
     }
