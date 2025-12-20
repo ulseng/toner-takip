@@ -96,7 +96,9 @@ export const Inventory: React.FC = () => {
       return config?.modelImages?.[model] || null;
   };
 
-  const filteredGroups = modelGroups.filter(g => g.modelName.toLowerCase().includes(searchTerm.toLowerCase()));
+  const filteredGroups = modelGroups.filter(g => 
+    g.modelName.toLocaleLowerCase('tr-TR').includes(searchTerm.toLocaleLowerCase('tr-TR'))
+  );
 
   if (loading) return <LoadingScreen message="Envanter analizi yapılıyor..." />;
 

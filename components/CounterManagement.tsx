@@ -448,11 +448,15 @@ export const CounterManagement: React.FC<CounterManagementProps> = ({ user }) =>
 
   const resetImport = () => { setParsedData([]); setMatchResults({matched: [], unmatched: []}); setImportError(null); };
 
-  const filteredPrinters = printers.filter(p => 
-      p.location.toLowerCase().includes(filterTerm.toLowerCase()) || 
-      p.model.toLowerCase().includes(filterTerm.toLowerCase()) ||
-      p.serialNumber.toLowerCase().includes(filterTerm.toLowerCase())
-  );
+  // UPDATED FILTER LOGIC FOR TURKISH CHARACTERS
+  const filteredPrinters = printers.filter(p => {
+      const searchLower = filterTerm.toLocaleLowerCase('tr-TR');
+      return (
+        p.location.toLocaleLowerCase('tr-TR').includes(searchLower) || 
+        p.model.toLocaleLowerCase('tr-TR').includes(searchLower) ||
+        p.serialNumber.toLocaleLowerCase('tr-TR').includes(searchLower)
+      );
+  });
 
   if (loading) return <LoadingScreen message="Sayaç verileri yükleniyor..." />;
 
