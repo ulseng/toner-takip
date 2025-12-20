@@ -524,16 +524,17 @@ export const PrinterList: React.FC<PrinterListProps> = ({ onSelectPrinter, targe
   };
 
 
-  // FILTER LOGIC
+  // FILTER LOGIC - UPDATED WITH TURKISH LOCALE AWARE SEARCH
   const uniqueFloors = ['ALL', ...Array.from(new Set(printers.map(p => p.floor))).filter(Boolean)];
   const uniqueStatuses = ['ALL', ...Array.from(new Set(printers.map(p => p.status))).filter(Boolean)];
 
   const filteredPrinters = printers.filter(p => {
+    const searchLower = searchTerm.toLocaleLowerCase('tr-TR');
     const matchesSearch = 
-        p.model.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.brand.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.serialNumber.toLowerCase().includes(searchTerm.toLowerCase());
+        p.model.toLocaleLowerCase('tr-TR').includes(searchLower) ||
+        p.brand.toLocaleLowerCase('tr-TR').includes(searchLower) ||
+        p.location.toLocaleLowerCase('tr-TR').includes(searchLower) ||
+        p.serialNumber.toLocaleLowerCase('tr-TR').includes(searchLower);
     
     const matchesFloor = selectedFloor === 'ALL' || p.floor === selectedFloor;
     const matchesStatus = selectedStatus === 'ALL' || p.status === selectedStatus;
@@ -763,7 +764,7 @@ export const PrinterList: React.FC<PrinterListProps> = ({ onSelectPrinter, targe
               </div>
 
               {/* ACTION FOOTER */}
-              <div className="grid grid-cols-2 border-t border-zinc-200 dark:border-zinc-800 divide-x divide-zinc-200 dark:divide-zinc-800">
+              <div className="grid grid-cols-2 border-t border-zinc-200 dark:border-zinc-800 divide-x divide-zinc-200 dark:border-zinc-800">
                 <button 
                     onClick={(e) => handleEditClick(e, printer)}
                     className="py-4 flex items-center justify-center gap-2 text-blue-600 dark:text-blue-400 font-semibold hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors active:bg-blue-100"
