@@ -1,4 +1,3 @@
-
 export interface User {
   username: string;
   name: string;
@@ -13,6 +12,7 @@ export type PrinterStatus = 'ACTIVE' | 'MAINTENANCE' | 'BROKEN' | 'SCRAPPED' | '
 export interface Printer {
   id: string;
   serialNumber: string;
+  shortCode?: string; // New: Unique 4-6 digit numeric code for manual entry
   brand: string;   // e.g. "Canon", "HP"
   model: string;   // e.g. "3325i"
   location: string;
