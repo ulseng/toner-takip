@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, MapPin, Hash, Printer as PrinterIcon, Edit2, X, Wifi, Usb, Globe, Trash2, History, Truck, AlertTriangle, QrCode, FileSpreadsheet, Download, CheckCircle2, XCircle, AlertCircle, Archive, RefreshCw, Users, UserPlus, Filter, Wallet, Calendar, Database, ArrowRight, Grid, Printer, ArrowUp, Loader2, Activity, Calculator, TrendingUp, BarChart3, ChevronLeft, Palette, Copy, Share2, ExternalLink } from 'lucide-react';
+import { Plus, Search, MapPin, Hash, Printer as PrinterIcon, Edit2, X, Wifi, Usb, Globe, Trash2, History, Truck, AlertTriangle, QrCode, FileSpreadsheet, Download, CheckCircle2, XCircle, AlertCircle, Archive, RefreshCw, Users, UserPlus, Filter, Wallet, Calendar, Database, ArrowRight, Grid, Printer, ArrowUp, Loader2, Activity, Calculator, TrendingUp, BarChart3, ChevronLeft, Palette, Copy, Share2, ExternalLink, Droplet, Clock, Settings, Wrench } from 'lucide-react';
 import { Printer as PrinterType, SystemConfig, StockLog, ServiceRecord, PrinterStatus, CounterLog } from '../types';
 import { StorageService } from '../services/storage';
 import { LoadingScreen } from './LoadingScreen';
-import { INITIAL_PRINTER_DATA } from './Settings';
 
 interface PrinterListProps {
   onSelectPrinter?: (printer: PrinterType) => void;
@@ -13,9 +12,10 @@ interface PrinterListProps {
 
 interface PrinterStats {
   totalSpent: number;
-  avgTonerDays: number | string;
-  totalServiceCount: number;
+  totalServiceCost: number;
+  totalTonerCost: number;
   lastServiceDate: string | null;
+  tonerCount: number;
 }
 
 export const PrinterList: React.FC<PrinterListProps> = ({ onSelectPrinter, targetPrinterId, clearTarget }) => {
@@ -23,8 +23,6 @@ export const PrinterList: React.FC<PrinterListProps> = ({ onSelectPrinter, targe
   const [config, setConfig] = useState<SystemConfig>({ brands: [], models: [], suppliers: [], tonerModels: [], brandImages: {}, modelImages: {} });
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
-  const [selectedFloor, setSelectedFloor] = useState<string>('ALL');
-  const [selectedStatus, setSelectedStatus] = useState<string>('ALL');
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [qrPrinter, setQrPrinter] = useState<PrinterType | null>(null);
@@ -57,14 +55,31 @@ export const PrinterList: React.FC<PrinterListProps> = ({ onSelectPrinter, targe
 
   useEffect(() => { loadData(); }, []);
 
+  // ESC Listener and Navigation Handler
   useEffect(() => {
     const handlePopState = (event: PopStateEvent) => {
-      if (qrPrinter) { setQrPrinter(null); return; }
-      if (isHistoryModalOpen) { setIsHistoryModalOpen(false); return; }
-      if (isFormModalOpen) { setIsFormModalOpen(false); setEditingPrinter(null); return; }
+      if (qrPrinter) setQrPrinter(null);
+      if (isHistoryModalOpen) setIsHistoryModalOpen(false);
+      if (isFormModalOpen) {
+        setIsFormModalOpen(false);
+        setEditingPrinter(null);
+      }
     };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (qrPrinter || isHistoryModalOpen || isFormModalOpen) {
+          window.history.back();
+        }
+      }
+    };
+
     window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
   }, [qrPrinter, isHistoryModalOpen, isFormModalOpen]);
 
   useEffect(() => {
@@ -79,10 +94,9 @@ export const PrinterList: React.FC<PrinterListProps> = ({ onSelectPrinter, targe
     setLoading(true);
     const [p, c] = await Promise.all([StorageService.getPrinters(), StorageService.getConfig()]);
     
-    // Auto-fix missing short codes if any exist without one
-    const missingCodes = p.some(printer => !printer.shortCode || printer.shortCode.length < 4);
-    if (missingCodes) {
-       console.log("Missing short codes detected, fixing...");
+    // Auto-fix missing short codes
+    const needsFix = p.some(printer => !printer.shortCode || printer.shortCode.length < 4);
+    if (needsFix) {
        await StorageService.fixMissingShortCodes();
        const updatedP = await StorageService.getPrinters();
        setPrinters(updatedP);
@@ -94,24 +108,6 @@ export const PrinterList: React.FC<PrinterListProps> = ({ onSelectPrinter, targe
     setLoading(false);
   };
 
-  const getBrandLogoUrl = (brand: string) => {
-    if (config.brandImages?.[brand]) return config.brandImages[brand];
-    const b = brand.toLowerCase();
-    if (b.includes('canon')) return 'https://cdn.simpleicons.org/canon/CC0000';
-    if (b.includes('hp')) return 'https://cdn.simpleicons.org/hp/0096D6';
-    if (b.includes('epson')) return 'https://cdn.simpleicons.org/epson/003399';
-    return null;
-  };
-
-  const getModelImageUrl = (model: string) => config.modelImages?.[model] || null;
-
-  const confirmDelete = (e: React.MouseEvent, id: string) => {
-    e.preventDefault(); e.stopPropagation();
-    if(window.confirm("Bu yazıcıyı silmek istediğinize emin misiniz?")) {
-        StorageService.deletePrinter(id).then(() => loadData());
-    }
-  };
-
   const handleEditClick = (e: React.MouseEvent, printer: PrinterType) => {
     e.preventDefault(); e.stopPropagation();
     openFormModal(printer);
@@ -121,19 +117,6 @@ export const PrinterList: React.FC<PrinterListProps> = ({ onSelectPrinter, targe
     e.preventDefault(); e.stopPropagation();
     window.history.pushState({ modal: 'qr' }, '');
     setQrPrinter(printer);
-  };
-
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const usersArray = connectedUsersInput.split(',').map(u => u.trim()).filter(u => u.length > 0);
-    const finalData = { ...formData, connectedUsers: usersArray };
-    if (editingPrinter?.id) {
-       await StorageService.updatePrinter({ ...editingPrinter, ...finalData } as PrinterType);
-    } else {
-       await StorageService.addPrinter({ id: '', lastTonerDate: new Date().toISOString(), ...finalData as PrinterType, status: finalData.status || 'ACTIVE' });
-    }
-    window.history.back();
-    loadData();
   };
 
   const openFormModal = (printer?: PrinterType) => {
@@ -151,13 +134,53 @@ export const PrinterList: React.FC<PrinterListProps> = ({ onSelectPrinter, targe
 
   const openHistoryModal = async (printer: PrinterType) => {
     window.history.pushState({ modal: 'history' }, '');
-    const [allLogs, allServices, allCounterLogs] = await Promise.all([StorageService.getLogs(), StorageService.getServiceRecords(), StorageService.getCounterLogs()]);
-    const printerLogs = allLogs.filter(log => log.printerId === printer.id).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    const printerServices = allServices.filter(srv => srv.printerId === printer.id).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    const printerCounterLogs = allCounterLogs.filter(l => l.printerId === printer.id).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    const totalSpent = printerLogs.reduce((sum, log) => sum + (log.cost || 0), 0) + printerServices.reduce((sum, srv) => sum + (srv.cost || 0), 0);
-    setSelectedPrinterHistory({ printer, tonerLogs: printerLogs, serviceLogs: printerServices, counterLogs: printerCounterLogs, stats: { totalSpent, avgTonerDays: '---', totalServiceCount: printerServices.length, lastServiceDate: printerServices[0]?.date || null } });
+    const [allLogs, allServices, allCounterLogs] = await Promise.all([
+        StorageService.getLogs(), 
+        StorageService.getServiceRecords(), 
+        StorageService.getCounterLogs()
+    ]);
+
+    const tonerLogs = allLogs.filter(log => log.printerId === printer.id).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const serviceLogs = allServices.filter(srv => srv.printerId === printer.id).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const counterLogs = allCounterLogs.filter(l => l.printerId === printer.id).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    const totalTonerCost = tonerLogs.reduce((sum, log) => sum + (log.cost || 0), 0);
+    const totalServiceCost = serviceLogs.reduce((sum, srv) => sum + (srv.cost || 0), 0);
+
+    setSelectedPrinterHistory({ 
+        printer, 
+        tonerLogs, 
+        serviceLogs, 
+        counterLogs, 
+        stats: { 
+            totalSpent: totalTonerCost + totalServiceCost, 
+            totalTonerCost,
+            totalServiceCost,
+            lastServiceDate: serviceLogs[0]?.date || null,
+            tonerCount: tonerLogs.length
+        } 
+    });
     setIsHistoryModalOpen(true);
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const usersArray = connectedUsersInput.split(',').map(u => u.trim()).filter(u => u.length > 0);
+    const finalData = { ...formData, connectedUsers: usersArray };
+    if (editingPrinter?.id) {
+       await StorageService.updatePrinter({ ...editingPrinter, ...finalData } as PrinterType);
+    } else {
+       await StorageService.addPrinter({ id: '', lastTonerDate: new Date().toISOString(), ...finalData as PrinterType, status: finalData.status || 'ACTIVE' });
+    }
+    window.history.back();
+    loadData();
+  };
+
+  const confirmDelete = (e: React.MouseEvent, id: string) => {
+    e.preventDefault(); e.stopPropagation();
+    if(window.confirm("Bu yazıcıyı silmek istediğinize emin misiniz?")) {
+        StorageService.deletePrinter(id).then(() => loadData());
+    }
   };
 
   const copyShortCode = (code: string) => {
@@ -173,7 +196,7 @@ export const PrinterList: React.FC<PrinterListProps> = ({ onSelectPrinter, targe
   if (loading) return <LoadingScreen message="Yazıcılar listeleniyor..." />;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-20">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-zinc-900 p-4 rounded-2xl shadow-sm border border-zinc-100 dark:border-zinc-800">
         <div><h2 className="text-2xl font-bold text-zinc-800 dark:text-white">Cihaz Yönetimi</h2><p className="text-sm text-zinc-500 dark:text-zinc-400">Toplam {printers.length} yazıcı</p></div>
         <div className="flex gap-2 w-full sm:w-auto">
@@ -203,14 +226,13 @@ export const PrinterList: React.FC<PrinterListProps> = ({ onSelectPrinter, targe
                       <h3 className="text-xl font-bold text-zinc-800 dark:text-white mb-2 group-hover:text-emerald-600 transition-colors truncate">{printer.model}</h3>
                       <div className="space-y-2 mt-4">
                           <div className="flex items-center gap-2 mb-4">
-                            {getBrandLogoUrl(printer.brand) ? <img src={getBrandLogoUrl(printer.brand)!} className="h-4 w-auto opacity-70 dark:invert" /> : <span className="text-xs font-bold text-zinc-400">{printer.brand}</span>}
-                            <span className="text-xs font-black text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-0.5 rounded-md">#{printer.shortCode || '----'}</span>
+                            <span className="text-xs font-black text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-0.5 rounded-md tracking-widest">#{printer.shortCode || '----'}</span>
                           </div>
                           <div className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400 text-xs pt-3 border-t border-zinc-100 dark:border-zinc-800"><Hash size={14} className="text-zinc-400" /> <span className="font-mono">{printer.serialNumber}</span></div>
                           <div className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400 text-xs"><Calculator size={14} className="text-zinc-400" /> <span className="font-mono font-bold text-blue-500">{printer.lastCounter.toLocaleString()}</span></div>
                       </div>
                   </div>
-                  {getModelImageUrl(printer.model) && <div className="w-16 shrink-0 flex items-center justify-center"><img src={getModelImageUrl(printer.model)!} className="max-h-20 w-full object-contain drop-shadow-md" /></div>}
+                  {config.modelImages?.[printer.model] && <div className="w-16 shrink-0 flex items-center justify-center"><img src={config.modelImages[printer.model]} className="max-h-20 w-full object-contain drop-shadow-md" /></div>}
               </div>
             </div>
             <div className="grid grid-cols-2 border-t border-zinc-100 dark:border-zinc-800 divide-x divide-zinc-100 dark:border-zinc-800">
@@ -220,6 +242,137 @@ export const PrinterList: React.FC<PrinterListProps> = ({ onSelectPrinter, targe
           </div>
         ))}
       </div>
+
+       {/* PRINTER HISTORY MODAL (DRAWER) */}
+       {isHistoryModalOpen && selectedPrinterHistory && (
+         <div className="fixed inset-0 z-[100] flex justify-end">
+             <div className="absolute inset-0 bg-black/70 backdrop-blur-sm animate-in fade-in duration-300" onClick={() => window.history.back()}></div>
+             <div className="relative w-full max-w-xl bg-white dark:bg-zinc-950 h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-500 overflow-hidden">
+                 
+                 {/* Detail Header */}
+                 <div className="p-6 bg-zinc-50 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 flex justify-between items-start">
+                     <div>
+                        <div className="flex items-center gap-2 mb-2">
+                           <span className="bg-emerald-600 text-white px-2 py-1 rounded text-[10px] font-black uppercase tracking-widest">#{selectedPrinterHistory.printer.shortCode}</span>
+                           <span className="text-zinc-400 text-xs font-mono">{selectedPrinterHistory.printer.serialNumber}</span>
+                        </div>
+                        <h3 className="text-2xl font-black text-zinc-900 dark:text-white leading-tight">{selectedPrinterHistory.printer.brand} {selectedPrinterHistory.printer.model}</h3>
+                        <p className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1 mt-1"><MapPin size={16}/> {selectedPrinterHistory.printer.location} ({selectedPrinterHistory.printer.floor})</p>
+                     </div>
+                     <button onClick={() => window.history.back()} className="p-2 bg-white dark:bg-zinc-800 rounded-full text-zinc-400 hover:text-red-500 shadow-sm transition-colors"><X size={24}/></button>
+                 </div>
+
+                 {/* Scrollable Content */}
+                 <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar bg-zinc-50/50 dark:bg-black/50">
+                    
+                    {/* Stats Dashboard */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        <div className="bg-white dark:bg-zinc-900 p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
+                            <p className="text-[10px] font-black text-zinc-400 uppercase mb-1">Toplam Sayaç</p>
+                            <p className="text-xl font-black text-zinc-900 dark:text-white flex items-center gap-2"><Calculator size={18} className="text-blue-500"/> {selectedPrinterHistory.printer.lastCounter.toLocaleString()}</p>
+                        </div>
+                        <div className="bg-white dark:bg-zinc-900 p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
+                            <p className="text-[10px] font-black text-zinc-400 uppercase mb-1">Toplam Maliyet</p>
+                            <p className="text-xl font-black text-emerald-600 dark:text-emerald-400 flex items-center gap-2"><Wallet size={18}/> {selectedPrinterHistory.stats.totalSpent.toLocaleString()} ₺</p>
+                        </div>
+                        <div className="bg-white dark:bg-zinc-900 p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm col-span-2 sm:col-span-1">
+                            <p className="text-[10px] font-black text-zinc-400 uppercase mb-1">Toner Sayısı</p>
+                            <p className="text-xl font-black text-orange-500 flex items-center gap-2"><Droplet size={18}/> {selectedPrinterHistory.stats.tonerCount} Adet</p>
+                        </div>
+                    </div>
+
+                    {/* Toner History */}
+                    <section>
+                        <h4 className="flex items-center gap-2 text-lg font-black text-zinc-800 dark:text-white mb-4"><Droplet className="text-orange-500" /> Toner Değişim Geçmişi</h4>
+                        <div className="space-y-3">
+                            {selectedPrinterHistory.tonerLogs.length === 0 ? (
+                                <div className="text-center p-8 bg-zinc-100 dark:bg-zinc-900/50 rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-800 text-zinc-400 text-sm">Henüz toner değişimi yapılmamış.</div>
+                            ) : (
+                                selectedPrinterHistory.tonerLogs.map(log => (
+                                    <div key={log.id} className="bg-white dark:bg-zinc-900 p-4 rounded-2xl border border-zinc-100 dark:border-zinc-800 flex justify-between items-center shadow-sm">
+                                        <div>
+                                            <p className="font-black text-zinc-800 dark:text-white">{log.tonerModel}</p>
+                                            <p className="text-xs text-zinc-400 flex items-center gap-1"><Calendar size={12}/> {new Date(log.date).toLocaleDateString('tr-TR')}</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-sm font-bold text-zinc-600 dark:text-zinc-400">{log.user}</p>
+                                            {log.cost ? <p className="text-xs font-black text-emerald-500">{log.cost} ₺</p> : null}
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </section>
+
+                    {/* Service Records */}
+                    <section>
+                        <h4 className="flex items-center gap-2 text-lg font-black text-zinc-800 dark:text-white mb-4"><Wrench className="text-blue-500" /> Arıza & Servis Kayıtları</h4>
+                        <div className="space-y-4">
+                             {selectedPrinterHistory.serviceLogs.length === 0 ? (
+                                <div className="text-center p-8 bg-zinc-100 dark:bg-zinc-900/50 rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-800 text-zinc-400 text-sm">Hiç servis kaydı bulunamadı.</div>
+                            ) : (
+                                selectedPrinterHistory.serviceLogs.map(srv => (
+                                    <div key={srv.id} className="bg-white dark:bg-zinc-900 p-4 rounded-2xl border-l-4 border-blue-500 dark:border-blue-600 shadow-sm">
+                                        <div className="flex justify-between items-start mb-2">
+                                            <span className={`text-[10px] font-black px-2 py-0.5 rounded ${srv.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-700' : 'bg-orange-100 text-orange-700'}`}>
+                                                {srv.status === 'COMPLETED' ? 'TAMAMLANDI' : 'BEKLEMEDE'}
+                                            </span>
+                                            <span className="text-xs text-zinc-400 font-mono">{new Date(srv.date).toLocaleDateString('tr-TR')}</span>
+                                        </div>
+                                        <p className="font-black text-zinc-800 dark:text-white text-sm">Sorun: {srv.issue}</p>
+                                        <p className="text-xs text-zinc-500 mt-1">İşlem: {srv.actionTaken}</p>
+                                        <div className="mt-3 pt-2 border-t border-zinc-50 dark:border-zinc-800 flex justify-between items-center">
+                                            <p className="text-[10px] text-zinc-400 font-bold uppercase">{srv.provider}</p>
+                                            <p className="font-black text-blue-600 dark:text-blue-400">{srv.cost.toLocaleString()} ₺</p>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </section>
+
+                    {/* Counter History */}
+                    <section>
+                         <h4 className="flex items-center gap-2 text-lg font-black text-zinc-800 dark:text-white mb-4"><BarChart3 className="text-purple-500" /> Sayaç Analizi</h4>
+                         <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-sm">
+                             <table className="w-full text-left text-xs">
+                                 <thead className="bg-zinc-50 dark:bg-zinc-800">
+                                     <tr>
+                                         <th className="p-3 text-zinc-400 font-black uppercase">Tarih</th>
+                                         <th className="p-3 text-zinc-400 font-black uppercase">Okunan</th>
+                                         <th className="p-3 text-zinc-400 font-black uppercase text-right">Kullanım</th>
+                                     </tr>
+                                 </thead>
+                                 <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                                     {selectedPrinterHistory.counterLogs.length === 0 ? (
+                                         <tr><td colSpan={3} className="p-6 text-center text-zinc-400">Veri yok.</td></tr>
+                                     ) : (
+                                         selectedPrinterHistory.counterLogs.map(log => (
+                                             <tr key={log.id}>
+                                                 <td className="p-3 text-zinc-600 dark:text-zinc-400">{new Date(log.date).toLocaleDateString('tr-TR')}</td>
+                                                 <td className="p-3 font-bold text-zinc-800 dark:text-white">{log.currentCounter.toLocaleString()}</td>
+                                                 <td className="p-3 text-right text-emerald-600 font-black">+{log.usage.toLocaleString()}</td>
+                                             </tr>
+                                         ))
+                                     )}
+                                 </tbody>
+                             </table>
+                         </div>
+                    </section>
+                 </div>
+                 
+                 {/* Detail Footer */}
+                 <div className="p-4 bg-white dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-800 flex gap-3">
+                     <button onClick={() => { window.history.back(); openFormModal(selectedPrinterHistory.printer); }} className="flex-1 py-4 bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-white rounded-2xl font-black flex items-center justify-center gap-2 hover:bg-zinc-200 transition-colors">
+                        <Edit2 size={18}/> Düzenle
+                     </button>
+                     <button onClick={() => window.history.back()} className="flex-1 py-4 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-2xl font-black transition-all active:scale-95">
+                        Kapat
+                     </button>
+                 </div>
+             </div>
+         </div>
+       )}
 
        {/* QR MODAL VIEWER */}
        {qrPrinter && (
