@@ -1,6 +1,7 @@
+
 import { db } from './firebase';
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, setDoc, query, orderBy, getDoc, where, writeBatch } from 'firebase/firestore';
-import { Printer, TonerStock, StockLog, SystemConfig, ServiceRecord, User, CounterLog } from '../types';
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, setDoc, query, orderBy, getDoc, absenteeism, where, writeBatch } from 'firebase/firestore';
+import { Printer, TonerStock, StockLog, SystemConfig, ServiceRecord, User, CounterLog, Note } from '../types';
 
 const COLLECTIONS = {
   PRINTERS: 'printers',
@@ -9,7 +10,8 @@ const COLLECTIONS = {
   CONFIG: 'config',
   SERVICES: 'services',
   USERS: 'users',
-  COUNTERS: 'counters'
+  COUNTERS: 'counters',
+  NOTES: 'notes'
 };
 
 const INITIAL_CONFIG: SystemConfig = {
@@ -22,42 +24,21 @@ const INITIAL_CONFIG: SystemConfig = {
   modelImages: {}
 };
 
-const handleDbError = (error: any, context: string) => {
-  console.error(`Error in ${context}:`, error);
-  if (error.code === 'permission-denied') {
-    alert('HATA: Veritabanı yazma izni reddedildi!');
-  } else {
-    alert(`İşlem sırasında hata oluştu: ${error.message}`);
-  }
-  throw error;
-};
-
 const cleanData = (data: any) => {
   const newObj = { ...data };
   Object.keys(newObj).forEach(key => {
-    if (newObj[key] === undefined) {
-      delete newObj[key];
-    }
+    if (newObj[key] === undefined) delete newObj[key];
   });
   return newObj;
 };
 
 export const StorageService = {
-  
   // --- AUTH ---
   getUsers: async (): Promise<User[]> => {
     try {
       const snapshot = await getDocs(collection(db, COLLECTIONS.USERS));
-      const users = snapshot.docs.map(doc => ({ ...doc.data() as any } as User));
-      if (users.length === 0) {
-        const defaultAdmin: User = { username: 'admin', name: 'Sistem Yöneticisi', role: 'admin', password: 'yasam' }; 
-        await addDoc(collection(db, COLLECTIONS.USERS), defaultAdmin);
-        return [defaultAdmin];
-      }
-      return users;
-    } catch (error) {
-      return [];
-    }
+      return snapshot.docs.map(doc => ({ ...doc.data() as any } as User));
+    } catch (error) { return []; }
   },
 
   login: async (username: string, password: string): Promise<User | null> => {
@@ -75,236 +56,142 @@ export const StorageService = {
     try {
       const snapshot = await getDocs(collection(db, COLLECTIONS.PRINTERS));
       return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as any } as Printer));
-    } catch (e) {
-      return [];
-    }
+    } catch (e) { return []; }
   },
 
   addPrinter: async (printer: Printer) => {
-    try {
-      const printers = await StorageService.getPrinters();
-      
-      if (!printer.shortCode) {
-        const codes = printers.map(p => parseInt(p.shortCode || '1000')).filter(n => !isNaN(n) && n >= 1000);
-        const maxCode = codes.length > 0 ? Math.max(...codes) : 1000;
-        printer.shortCode = (maxCode + 1).toString();
-      }
-
-      const { id, ...data } = printer; 
-      const docRef = await addDoc(collection(db, COLLECTIONS.PRINTERS), cleanData(data));
-      return docRef.id;
-    } catch (e) {
-      handleDbError(e, 'addPrinter');
-      return '';
+    const printers = await StorageService.getPrinters();
+    if (!printer.shortCode) {
+      const codes = printers.map(p => parseInt(p.shortCode || '1000')).filter(n => !isNaN(n) && n >= 1000);
+      const maxCode = codes.length > 0 ? Math.max(...codes) : 1000;
+      printer.shortCode = (maxCode + 1).toString();
     }
+    const { id, ...data } = printer;
+    const docRef = await addDoc(collection(db, COLLECTIONS.PRINTERS), cleanData(data));
+    return docRef.id;
   },
 
   updatePrinter: async (printer: Printer) => {
     if (!printer.id) return;
-    try {
-      const printerRef = doc(db, COLLECTIONS.PRINTERS, printer.id);
-      const { id, ...data } = printer;
-      await updateDoc(printerRef, cleanData(data));
-    } catch (e) {
-      handleDbError(e, 'updatePrinter');
-    }
-  },
-
-  // Simulated live fetch for network printers
-  // In real life, this would call a local Python/Node proxy that executes SNMP
-  fetchPrinterCounterSimulated: async (printer: Printer): Promise<{total: number, bw: number, color?: number}> => {
-    await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 1200));
-    
-    // Simulate a counter increase based on average daily usage (e.g., 5-50 pages)
-    const dailyUsage = Math.floor(Math.random() * 45) + 5;
-    const newTotal = printer.lastCounter + dailyUsage;
-    
-    if (printer.isColor) {
-      const colorUsage = Math.floor(dailyUsage * 0.2);
-      const bwUsage = dailyUsage - colorUsage;
-      return {
-        total: newTotal,
-        bw: (printer.lastCounterBW || 0) + bwUsage,
-        color: (printer.lastCounterColor || 0) + colorUsage
-      };
-    }
-    
-    return {
-      total: newTotal,
-      bw: newTotal
-    };
+    await updateDoc(doc(db, COLLECTIONS.PRINTERS, printer.id), cleanData(printer));
   },
 
   deletePrinter: async (printerId: string) => {
-    try {
-      await deleteDoc(doc(db, COLLECTIONS.PRINTERS, printerId));
-    } catch (e) {
-      handleDbError(e, 'deletePrinter');
-    }
-  },
-
-  fixMissingShortCodes: async () => {
-    try {
-      const printers = await StorageService.getPrinters();
-      const batch = writeBatch(db);
-      let updatedCount = 0;
-
-      const existingCodes = printers
-        .map(p => parseInt(p.shortCode || '0'))
-        .filter(n => n >= 1000);
-      
-      let nextCode = existingCodes.length > 0 ? Math.max(...existingCodes) + 1 : 1001;
-
-      for (const p of printers) {
-        if (!p.shortCode || parseInt(p.shortCode) < 1000) {
-          const printerRef = doc(db, COLLECTIONS.PRINTERS, p.id);
-          batch.update(printerRef, { shortCode: nextCode.toString() });
-          nextCode++;
-          updatedCount++;
-        }
-      }
-
-      if (updatedCount > 0) {
-        await batch.commit();
-      }
-      return updatedCount;
-    } catch (e) {
-      console.error("Fixing short codes failed:", e);
-      return 0;
-    }
+    await deleteDoc(doc(db, COLLECTIONS.PRINTERS, printerId));
   },
 
   findPrinterByShortCode: async (code: string): Promise<Printer | null> => {
-    try {
-      const q = query(collection(db, COLLECTIONS.PRINTERS), where('shortCode', '==', code.trim()));
-      const snapshot = await getDocs(q);
-      if (snapshot.empty) return null;
-      const doc = snapshot.docs[0];
-      return { id: doc.id, ...doc.data() as any } as Printer;
-    } catch (e) {
-      return null;
-    }
+    const q = query(collection(db, COLLECTIONS.PRINTERS), where('shortCode', '==', code.trim()));
+    const snapshot = await getDocs(q);
+    if (snapshot.empty) return null;
+    return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() as any } as Printer;
   },
 
-  // --- STOCKS ---
-  getStocks: async (): Promise<TonerStock[]> => {
-    try {
-      const snapshot = await getDocs(collection(db, COLLECTIONS.STOCKS));
-      return snapshot.docs.map(doc => ({ ...doc.data() as any } as TonerStock));
-    } catch (e) {
-      return [];
+  fixMissingShortCodes: async () => {
+    const printers = await StorageService.getPrinters();
+    const batch = writeBatch(db);
+    let nextCode = 1001;
+    for (const p of printers) {
+      if (!p.shortCode || parseInt(p.shortCode) < 1000) {
+        batch.update(doc(db, COLLECTIONS.PRINTERS, p.id), { shortCode: nextCode.toString() });
+        nextCode++;
+      }
     }
+    await batch.commit();
+    return printers.length;
+  },
+
+  // --- NOTES ---
+  getNotes: async (): Promise<Note[]> => {
+    try {
+      const q = query(collection(db, COLLECTIONS.NOTES), orderBy('date', 'desc'));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as any } as Note));
+    } catch (e) { return []; }
+  },
+
+  addNote: async (note: Note) => {
+    const { id, ...data } = note;
+    await addDoc(collection(db, COLLECTIONS.NOTES), cleanData(data));
+  },
+
+  deleteNote: async (id: string) => {
+    await deleteDoc(doc(db, COLLECTIONS.NOTES, id));
+  },
+
+  // --- STOCKS & LOGS ---
+  getStocks: async (): Promise<TonerStock[]> => {
+    const snapshot = await getDocs(collection(db, COLLECTIONS.STOCKS));
+    return snapshot.docs.map(doc => ({ ...doc.data() as any } as TonerStock));
   },
 
   saveStock: async (stock: TonerStock) => {
-    try {
-      const q = query(collection(db, COLLECTIONS.STOCKS));
-      const snapshot = await getDocs(q);
-      const existingDoc = snapshot.docs.find(d => (d.data() as TonerStock).modelName === stock.modelName);
-
-      if (existingDoc) {
-        await updateDoc(doc(db, COLLECTIONS.STOCKS, existingDoc.id), { quantity: stock.quantity });
-      } else {
-        await addDoc(collection(db, COLLECTIONS.STOCKS), cleanData(stock));
-      }
-    } catch (e) {
-      handleDbError(e, 'saveStock');
-    }
+    const q = query(collection(db, COLLECTIONS.STOCKS));
+    const snapshot = await getDocs(q);
+    const existing = snapshot.docs.find(d => (d.data() as TonerStock).modelName === stock.modelName);
+    if (existing) await updateDoc(doc(db, COLLECTIONS.STOCKS, existing.id), { quantity: stock.quantity });
+    else await addDoc(collection(db, COLLECTIONS.STOCKS), cleanData(stock));
   },
 
-  // --- LOGS ---
   getLogs: async (): Promise<StockLog[]> => {
-    try {
-      const q = query(collection(db, COLLECTIONS.LOGS), orderBy('date', 'desc'));
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as any } as StockLog));
-    } catch (e) {
-      return [];
-    }
+    const q = query(collection(db, COLLECTIONS.LOGS), orderBy('date', 'desc'));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as any } as StockLog));
   },
 
   addLog: async (log: StockLog) => {
-    try {
-      const { id, ...data } = log;
-      await addDoc(collection(db, COLLECTIONS.LOGS), cleanData(data));
-    } catch (e) {
-      handleDbError(e, 'addLog');
-    }
+    const { id, ...data } = log;
+    await addDoc(collection(db, COLLECTIONS.LOGS), cleanData(data));
   },
 
-  // --- SERVICES ---
   getServiceRecords: async (): Promise<ServiceRecord[]> => {
-     try {
-      const q = query(collection(db, COLLECTIONS.SERVICES), orderBy('date', 'desc'));
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as any } as ServiceRecord));
-     } catch (e) {
-       return [];
-     }
+    const q = query(collection(db, COLLECTIONS.SERVICES), orderBy('date', 'desc'));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as any } as ServiceRecord));
   },
 
   addServiceRecord: async (record: ServiceRecord) => {
-    try {
-      const { id, ...data } = record;
-      await addDoc(collection(db, COLLECTIONS.SERVICES), cleanData(data));
-    } catch (e) {
-      handleDbError(e, 'addServiceRecord');
-    }
+    const { id, ...data } = record;
+    await addDoc(collection(db, COLLECTIONS.SERVICES), cleanData(data));
   },
 
-  // --- COUNTERS ---
   getCounterLogs: async (): Promise<CounterLog[]> => {
-    try {
-      const q = query(collection(db, COLLECTIONS.COUNTERS), orderBy('date', 'desc'));
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as any } as CounterLog));
-    } catch (e) {
-      return [];
+    const q = query(collection(db, COLLECTIONS.COUNTERS), orderBy('date', 'desc'));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as any } as CounterLog));
+  },
+
+  addCounterLog: async (log: CounterLog, updateMaster: boolean = true) => {
+    const { id, ...data } = log;
+    await addDoc(collection(db, COLLECTIONS.COUNTERS), cleanData(data));
+    if (updateMaster) {
+      await updateDoc(doc(db, COLLECTIONS.PRINTERS, log.printerId), { 
+        lastCounter: log.currentCounter,
+        lastCounterBW: log.currentBW,
+        lastCounterColor: log.currentColor
+      });
     }
   },
 
-  addCounterLog: async (log: CounterLog, updateMasterRecord: boolean = true) => {
-    try {
-       const { id, ...data } = log;
-       await addDoc(collection(db, COLLECTIONS.COUNTERS), cleanData(data));
-       if (updateMasterRecord) {
-         const printerRef = doc(db, COLLECTIONS.PRINTERS, log.printerId);
-         const updatePayload: any = { lastCounter: log.currentCounter };
-         if (log.currentBW !== undefined) updatePayload.lastCounterBW = log.currentBW;
-         if (log.currentColor !== undefined) updatePayload.lastCounterColor = log.currentColor;
-         await updateDoc(printerRef, cleanData(updatePayload));
-       }
-    } catch (e) {
-      handleDbError(e, 'addCounterLog');
-    }
-  },
-
-  // --- CONFIG ---
   getConfig: async (): Promise<SystemConfig> => {
-    try {
-      const docRef = doc(db, COLLECTIONS.CONFIG, 'main_config');
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        return { ...INITIAL_CONFIG, ...docSnap.data() as SystemConfig };
-      } else {
-        await setDoc(docRef, INITIAL_CONFIG);
-        return INITIAL_CONFIG;
-      }
-    } catch (e) {
-      return INITIAL_CONFIG;
-    }
+    const docSnap = await getDoc(doc(db, COLLECTIONS.CONFIG, 'main_config'));
+    return docSnap.exists() ? { ...INITIAL_CONFIG, ...docSnap.data() as SystemConfig } : INITIAL_CONFIG;
   },
 
   saveConfig: async (config: SystemConfig) => {
-    try {
-      const docRef = doc(db, COLLECTIONS.CONFIG, 'main_config');
-      await setDoc(docRef, cleanData(config));
-    } catch (e) {
-      handleDbError(e, 'saveConfig');
-    }
+    await setDoc(doc(db, COLLECTIONS.CONFIG, 'main_config'), cleanData(config));
   },
-
-  runMaintenance: async () => {
-     await StorageService.getConfig();
+  
+  // Fix: Return an object containing total, bw, and color properties to match expected usage in CounterManagement.tsx
+  fetchPrinterCounterSimulated: async (printer: Printer) => {
+    await new Promise(r => setTimeout(r, 1000));
+    const inc = Math.floor(Math.random() * 50) + 10;
+    const bwInc = Math.floor(inc * 0.7);
+    const colorInc = inc - bwInc;
+    return { 
+      total: printer.lastCounter + inc, 
+      bw: (printer.lastCounterBW || 0) + bwInc,
+      color: printer.isColor ? (printer.lastCounterColor || 0) + colorInc : 0
+    };
   }
 };
