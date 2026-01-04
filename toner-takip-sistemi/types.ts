@@ -1,8 +1,9 @@
+
 export interface User {
   username: string;
   name: string;
   role: 'admin' | 'user';
-  password?: string; // Added for internal DB storage
+  password?: string;
 }
 
 export type ConnectionType = 'USB' | 'Network';
@@ -12,24 +13,30 @@ export type PrinterStatus = 'ACTIVE' | 'MAINTENANCE' | 'BROKEN' | 'SCRAPPED' | '
 export interface Printer {
   id: string;
   serialNumber: string;
-  shortCode?: string; // New: Unique 4-6 digit numeric code for manual entry
-  brand: string;   // e.g. "Canon", "HP"
-  model: string;   // e.g. "3325i"
+  shortCode?: string;
+  brand: string;
+  model: string;
   location: string;
   floor: string;
-  lastCounter: number; // Represents TOTAL counter
+  lastCounter: number;
   lastTonerDate: string;
   compatibleToner: string;
   connectionType: ConnectionType;
-  ipAddress?: string; // Only if Network
-  supplier: string; // e.g. "Anahtar Bilgisayar", "Enes Bilişim"
-  status: PrinterStatus; // New Visual Status
-  connectedUsers?: string[]; // New: List of users connected to this printer
-  
-  // New Fields for Multi-Counter
-  isColor?: boolean; // If true, enables A4-SB and A4-RL inputs
-  lastCounterBW?: number; // Last known Black&White counter
-  lastCounterColor?: number; // Last known Color counter
+  ipAddress?: string;
+  supplier: string;
+  status: PrinterStatus;
+  connectedUsers?: string[];
+  isColor?: boolean;
+  lastCounterBW?: number;
+  lastCounterColor?: number;
+}
+
+export interface Note {
+  id: string;
+  title: string;
+  content: string;
+  date: string;
+  user: string;
 }
 
 export interface TonerStock {
@@ -46,20 +53,20 @@ export interface StockLog {
   description: string;
   printerId?: string;
   user: string;
-  cost?: number; // Added for tracking Ink/Toner costs
-  pageYield?: number; // New: How many pages printed with the previous toner?
+  cost?: number;
+  pageYield?: number;
 }
 
 export interface ServiceRecord {
   id: string;
   printerId: string;
-  printerName: string; // Cache name for easier display
+  printerName: string;
   date: string;
-  issue: string; // Arıza tanımı
-  actionTaken: string; // Yapılan işlem
+  issue: string;
+  actionTaken: string;
   cost: number;
-  provider: string; // Servis firması
-  status: 'PENDING' | 'COMPLETED' | 'SCRAPPED'; // Bekliyor, Tamamlandı, Hurda
+  provider: string;
+  status: 'PENDING' | 'COMPLETED' | 'SCRAPPED';
 }
 
 export interface CounterLog {
@@ -67,29 +74,24 @@ export interface CounterLog {
   printerId: string;
   printerName: string;
   serialNumber: string;
-  date: string; // YYYY-MM-DD format usually (the 15th of month)
+  date: string;
   previousCounter: number;
   currentCounter: number;
-  usage: number; // current - previous
-  recordedBy: string; // User or "System Import"
-  
-  // New Fields for Detail Logging
+  usage: number;
+  recordedBy: string;
   usageBW?: number;
   usageColor?: number;
   currentBW?: number;
   currentColor?: number;
-  
-  // Advanced Dynamic Counters (e.g. A3 BW, A3 Color)
   customCounters?: { label: string; value: number }[];
 }
 
 export interface SystemConfig {
   brands: string[];
   models: string[];
-  suppliers: string[]; // List of vendors
-  tonerModels: string[]; // New: List of toner types
-  whatsappNumber?: string; // For notifications
-  // New Image Maps (Key: Name, Value: Image URL)
+  suppliers: string[];
+  tonerModels: string[];
+  whatsappNumber?: string;
   brandImages?: Record<string, string>; 
   modelImages?: Record<string, string>;
 }

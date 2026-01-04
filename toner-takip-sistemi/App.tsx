@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Layout } from './components/Layout';
 import { Login } from './components/Login';
@@ -10,7 +11,8 @@ import { ServiceManagement } from './components/ServiceManagement';
 import { QrManagement } from './components/QrManagement';
 import { QrScanner } from './components/QrScanner';
 import { Inventory } from './components/Inventory';
-import { CounterManagement } from './components/CounterManagement'; // New Import
+import { CounterManagement } from './components/CounterManagement';
+import { Notes } from './components/Notes';
 import { User } from './types';
 
 function App() {
@@ -21,30 +23,18 @@ function App() {
 
   useEffect(() => {
     const savedUser = localStorage.getItem('app_user');
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
-    }
+    if (savedUser) setUser(JSON.parse(savedUser));
     
     const savedTheme = localStorage.getItem('app_theme');
-    if (savedTheme === 'dark') {
-      setIsDarkMode(true);
-    }
+    if (savedTheme === 'dark') setIsDarkMode(true);
 
-    // QR Code Deep Link Handler
     const params = new URLSearchParams(window.location.search);
     const pid = params.get('pid');
-    if (pid) {
-      // If we have a printer ID in URL, save it to state
-      setTargetPrinterId(pid);
-      // We will switch tab after login check in render
-    }
+    if (pid) setTargetPrinterId(pid);
   }, []);
 
-  // Effect to switch tab once user is logged in and we have a target
   useEffect(() => {
-    if (user && targetPrinterId) {
-      setActiveTab('printers');
-    }
+    if (user && targetPrinterId) setActiveTab('printers');
   }, [user, targetPrinterId]);
 
   const handleLogin = (user: User) => {
@@ -57,7 +47,6 @@ function App() {
     setUser(null);
     setActiveTab('dashboard');
     setTargetPrinterId(null);
-    // Clear URL params on logout to prevent loop
     window.history.replaceState({}, '', window.location.pathname);
   };
 
@@ -87,12 +76,13 @@ function App() {
       >
         {activeTab === 'dashboard' && <Dashboard />}
         {activeTab === 'scan' && <QrScanner />}
+        {activeTab === 'qr' && <QrManagement />}
+        {activeTab === 'notes' && <Notes user={user} />}
         {activeTab === 'printers' && <PrinterList targetPrinterId={targetPrinterId} clearTarget={() => setTargetPrinterId(null)} />}
         {activeTab === 'inventory' && <Inventory />} 
         {activeTab === 'counters' && <CounterManagement user={user} />}
         {activeTab === 'service' && <ServiceManagement />}
         {activeTab === 'stock' && <StockManagement user={user} />}
-        {activeTab === 'qr' && <QrManagement />}
         {activeTab === 'history' && <History />}
         {activeTab === 'settings' && <Settings />}
       </Layout>
