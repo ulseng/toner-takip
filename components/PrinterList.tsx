@@ -1,8 +1,95 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Search, MapPin, Hash, Printer as PrinterIcon, Edit2, X, Wifi, Usb, Trash2, QrCode, Download, RefreshCw, Wallet, Calendar, Calculator, BarChart3, Copy, Share2, Wrench, Droplet, Globe, Activity, ChevronRight, TrendingUp, Clock, User as UserIcon } from 'lucide-react';
-import { Printer as PrinterType, SystemConfig, StockLog, ServiceRecord, PrinterStatus, CounterLog } from '../types';
+
+import React, { useState, useEffect, useMemo, memo } from 'react';
+import { Plus, Search, MapPin, Printer as PrinterIcon, Edit2, X, Wifi, Usb, Trash2, QrCode, RefreshCw, Calendar, Calculator, Wrench, Droplet, Globe, TrendingUp, User as UserIcon, SortAsc, SortDesc, Filter, Layers, LayoutGrid, Type, Clock, ShieldCheck, Zap, StickyNote, Image as ImageIcon } from 'lucide-react';
+import { Printer as PrinterType, SystemConfig, StockLog, ServiceRecord, CounterLog, Note } from '../types';
 import { StorageService } from '../services/storage';
 import { LoadingScreen } from './LoadingScreen';
+
+// Yazıcı Kartı Bileşeni - Performans için Memoized edildi
+const PrinterCard = memo(({ printer, onOpen, onEdit, onDelete, modelImage }: { 
+  printer: PrinterType, 
+  onOpen: (p: PrinterType) => void, 
+  onEdit: (e: React.MouseEvent, p: PrinterType) => void,
+  onDelete: (e: React.MouseEvent, p: PrinterType) => void,
+  modelImage: string | null
+}) => {
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'ACTIVE': return 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]';
+      case 'MAINTENANCE': return 'bg-orange-500';
+      case 'BROKEN': return 'bg-red-500';
+      default: return 'bg-zinc-500';
+    }
+  };
+
+  return (
+    <div 
+      onClick={() => onOpen(printer)} 
+      className="group rounded-[2.5rem] bg-[#121214] border border-white/5 transition-all duration-300 hover:border-emerald-500/20 active:scale-[0.98] cursor-pointer shadow-xl flex flex-col overflow-hidden"
+    >
+      {/* Cihaz Fotoğraf Alanı */}
+      <div className="relative h-44 bg-zinc-900 flex items-center justify-center overflow-hidden border-b border-white/5">
+        {modelImage ? (
+          <img 
+            src={modelImage} 
+            alt={printer.model} 
+            loading="lazy"
+            className="w-full h-full object-contain p-6 transform group-hover:scale-105 transition-transform duration-500"
+          />
+        ) : (
+          <div className="flex flex-col items-center gap-2 text-zinc-800">
+             <PrinterIcon size={40} strokeWidth={1.5} />
+             <span className="text-[8px] font-black uppercase tracking-widest opacity-20">Fotoğraf Yok</span>
+          </div>
+        )}
+        <div className={`absolute top-4 right-4 w-2.5 h-2.5 rounded-full ${getStatusBadge(printer.status)} border-2 border-zinc-900 z-10`}></div>
+        <div className="absolute bottom-3 left-4">
+           <span className="bg-black/60 backdrop-blur-sm text-emerald-500 px-2 py-0.5 rounded-lg text-[9px] font-black border border-white/5">#{printer.shortCode}</span>
+        </div>
+      </div>
+
+      <div className="p-6 flex-1">
+          {/* Lokasyon ve Kat Bilgisi */}
+          <div className="flex items-start gap-3 mb-4">
+            <div className="p-2 bg-emerald-500/10 text-emerald-500 rounded-xl shrink-0">
+               <MapPin size={16} strokeWidth={2.5}/>
+            </div>
+            <div className="flex flex-col min-w-0">
+               <span className="text-base font-black text-white uppercase tracking-tight leading-tight truncate">
+                 {printer.location}
+               </span>
+               <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest truncate">
+                 {printer.floor || 'Bilinmeyen Kat'}
+               </span>
+            </div>
+          </div>
+          
+          <h3 className="text-lg font-black text-zinc-400 leading-none tracking-tighter uppercase mb-4 group-hover:text-white transition-colors">
+            {printer.brand} {printer.model}
+          </h3>
+          
+          <div className="flex flex-wrap gap-2 mb-6">
+              {printer.connectionType === 'Network' ? (
+                  <span className="bg-blue-500/10 text-blue-400 px-3 py-1 rounded-lg text-[9px] font-black uppercase border border-blue-500/20 flex items-center gap-1"><Wifi size={12}/> {printer.ipAddress}</span>
+              ) : (
+                  <span className="bg-zinc-800 text-zinc-500 px-3 py-1 rounded-lg text-[9px] font-black uppercase border border-white/5 flex items-center gap-1"><Usb size={12}/> USB BAĞLANTI</span>
+              )}
+          </div>
+
+          <div className="pt-5 border-t border-white/5 flex justify-between items-center">
+              <div className="space-y-0.5">
+                  <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest">SAYAÇ</p>
+                  <p className="text-2xl font-mono font-black text-white leading-none">{printer.lastCounter.toLocaleString('tr-TR')}</p>
+              </div>
+              <div className="flex gap-2">
+                 <button onClick={(e) => onEdit(e, printer)} className="p-2.5 bg-zinc-900 text-zinc-500 hover:text-emerald-500 hover:bg-emerald-500/10 rounded-xl transition-all border border-white/5"><Edit2 size={14}/></button>
+                 <button onClick={(e) => onDelete(e, printer)} className="p-2.5 bg-zinc-900 text-zinc-500 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all border border-white/5"><Trash2 size={14}/></button>
+              </div>
+          </div>
+      </div>
+    </div>
+  );
+});
 
 interface PrinterListProps {
   onSelectPrinter?: (printer: PrinterType) => void;
@@ -10,57 +97,45 @@ interface PrinterListProps {
   clearTarget?: () => void;
 }
 
-interface PrinterStats {
-  totalSpent: number;
-  totalServiceCost: number;
-  totalTonerCost: number;
-  lastServiceDate: string | null;
-  tonerCount: number;
-}
-
 export const PrinterList: React.FC<PrinterListProps> = ({ targetPrinterId, clearTarget }) => {
   const [printers, setPrinters] = useState<PrinterType[]>([]);
   const [config, setConfig] = useState<SystemConfig>({ brands: [], models: [], suppliers: [], tonerModels: [], brandImages: {}, modelImages: {} });
   const [searchTerm, setSearchTerm] = useState('');
+  const [sortBy, setSortBy] = useState<'AZ' | 'ZA'>('AZ');
   const [loading, setLoading] = useState(true);
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
-  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
-  const [qrPrinter, setQrPrinter] = useState<PrinterType | null>(null);
   const [editingPrinter, setEditingPrinter] = useState<PrinterType | null>(null);
-  const [selectedPrinterHistory, setSelectedPrinterHistory] = useState<{
-      printer: PrinterType, 
-      tonerLogs: StockLog[], 
-      serviceLogs: ServiceRecord[], 
-      counterLogs: CounterLog[], 
-      stats: PrinterStats
-  } | null>(null);
+  
+  const [selectedFloor, setSelectedFloor] = useState<string | null>(null);
+  const [selectedModel, setSelectedModel] = useState<string | null>(null);
+  const [showFilters, setShowFilters] = useState(false);
+  
+  const [selectedPrinter, setSelectedPrinter] = useState<PrinterType | null>(null);
+  const [printerServices, setPrinterServices] = useState<ServiceRecord[]>([]);
+  const [printerCounters, setPrinterCounters] = useState<CounterLog[]>([]);
+  const [printerTonerLogs, setPrinterTonerLogs] = useState<StockLog[]>([]);
+  const [printerNotes, setPrinterNotes] = useState<Note[]>([]);
 
   const [formData, setFormData] = useState<Partial<PrinterType>>({
-    brand: '',
-    model: '',
-    serialNumber: '',
-    shortCode: '',
-    location: '',
-    floor: '',
-    lastCounter: 0,
-    connectionType: 'USB',
-    ipAddress: '',
-    status: 'ACTIVE'
+    brand: '', model: '', serialNumber: '', shortCode: '', location: '', floor: '',
+    lastCounter: 0, connectionType: 'USB', ipAddress: '', status: 'ACTIVE'
   });
 
-  useEffect(() => { loadData(); }, []);
+  const [isCustomBrand, setIsCustomBrand] = useState(false);
+  const [isCustomModel, setIsCustomModel] = useState(false);
+  const [customBrand, setCustomBrand] = useState('');
+  const [customModel, setCustomModel] = useState('');
 
+  // Navigasyon ve ESC Kontrolü
   useEffect(() => {
     const handlePopState = () => {
-      setQrPrinter(null);
-      setIsHistoryModalOpen(false);
+      setSelectedPrinter(null);
       setIsFormModalOpen(false);
-      setEditingPrinter(null);
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (qrPrinter || isHistoryModalOpen || isFormModalOpen) {
+        if (selectedPrinter || isFormModalOpen) {
           window.history.back();
         }
       }
@@ -72,12 +147,14 @@ export const PrinterList: React.FC<PrinterListProps> = ({ targetPrinterId, clear
       window.removeEventListener('popstate', handlePopState);
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [qrPrinter, isHistoryModalOpen, isFormModalOpen]);
+  }, [selectedPrinter, isFormModalOpen]);
+
+  useEffect(() => { loadData(); }, []);
 
   useEffect(() => {
     if (targetPrinterId && printers.length > 0) {
-      const target = printers.find(p => p.id === targetPrinterId);
-      if (target) openHistoryModal(target);
+      const p = printers.find(x => x.id === targetPrinterId);
+      if (p) handleOpenDetail(p);
       if (clearTarget) clearTarget();
     }
   }, [targetPrinterId, printers]);
@@ -85,302 +162,295 @@ export const PrinterList: React.FC<PrinterListProps> = ({ targetPrinterId, clear
   const loadData = async () => {
     setLoading(true);
     const [p, c] = await Promise.all([StorageService.getPrinters(), StorageService.getConfig()]);
-    const needsFix = p.some(printer => !printer.shortCode || printer.shortCode.length < 4);
-    if (needsFix) {
-       await StorageService.fixMissingShortCodes();
-       const updatedP = await StorageService.getPrinters();
-       setPrinters(updatedP);
-    } else {
-       setPrinters(p);
-    }
+    setPrinters(p);
     setConfig(c);
     setLoading(false);
   };
 
-  const openFormModal = (printer?: PrinterType) => {
+  const handleOpenDetail = async (printer: PrinterType) => {
+    window.history.pushState({ modal: 'detail' }, '');
+    setSelectedPrinter(printer);
+    const [services, counters, logs, notes] = await Promise.all([
+      StorageService.getServiceRecords(),
+      StorageService.getCounterLogs(),
+      StorageService.getLogs(),
+      StorageService.getNotesByPrinter(printer.id)
+    ]);
+    setPrinterServices(services.filter(s => s.printerId === printer.id).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+    setPrinterCounters(counters.filter(c => c.printerId === printer.id).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+    setPrinterTonerLogs(logs.filter(l => l.printerId === printer.id && l.type === 'OUT').sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+    setPrinterNotes(notes);
+  };
+
+  const openFormModal = (e: React.MouseEvent, printer?: PrinterType) => {
+    e.stopPropagation();
     window.history.pushState({ modal: 'form' }, '');
     if (printer) {
-      setEditingPrinter(printer); setFormData(printer);
+      setEditingPrinter(printer); setFormData({ ...printer });
+      setIsCustomBrand(!config.brands.includes(printer.brand));
+      setCustomBrand(config.brands.includes(printer.brand) ? '' : printer.brand);
+      setIsCustomModel(!config.models.includes(printer.model));
+      setCustomModel(config.models.includes(printer.model) ? '' : printer.model);
     } else {
-      setEditingPrinter(null);
-      setFormData({ brand: config.brands[0] || '', model: config.models[0] || '', status: 'ACTIVE', connectionType: 'USB' });
+      setEditingPrinter(null); setFormData({ brand: config.brands[0] || '', model: config.models[0] || '', status: 'ACTIVE', connectionType: 'USB' });
+      setIsCustomBrand(false); setIsCustomModel(false); setCustomBrand(''); setCustomModel('');
     }
     setIsFormModalOpen(true);
   };
 
-  const openHistoryModal = async (printer: PrinterType) => {
-    window.history.pushState({ modal: 'history' }, '');
-    const [allLogs, allServices, allCounterLogs] = await Promise.all([
-        StorageService.getLogs(), 
-        StorageService.getServiceRecords(), 
-        StorageService.getCounterLogs()
-    ]);
-
-    const tonerLogs = allLogs.filter(log => log.printerId === printer.id).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    const serviceLogs = allServices.filter(srv => srv.printerId === printer.id).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    const counterLogs = allCounterLogs.filter(l => l.printerId === printer.id).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-    const totalTonerCost = tonerLogs.reduce((sum, log) => sum + (log.cost || 0), 0);
-    const totalServiceCost = serviceLogs.reduce((sum, srv) => sum + (srv.cost || 0), 0);
-
-    setSelectedPrinterHistory({ 
-        printer, tonerLogs, serviceLogs, counterLogs, 
-        stats: { totalSpent: totalTonerCost + totalServiceCost, totalTonerCost, totalServiceCost, lastServiceDate: serviceLogs[0]?.date || null, tonerCount: tonerLogs.length } 
-    });
-    setIsHistoryModalOpen(true);
-  };
-
-  const confirmDelete = async (e: React.MouseEvent, id: string) => {
-    e.preventDefault(); e.stopPropagation();
-    if (window.confirm('Bu yazıcıyı kalıcı olarak silmek istediğinize emin misiniz?')) {
-      await StorageService.deletePrinter(id);
-      loadData();
-    }
-  };
-
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingPrinter?.id) {
-       await StorageService.updatePrinter({ ...editingPrinter, ...formData } as PrinterType);
-    } else {
-       await StorageService.addPrinter({ id: '', lastTonerDate: new Date().toISOString(), ...formData as PrinterType });
-    }
-    window.history.back();
-    loadData();
+    const finalBrand = isCustomBrand ? customBrand.trim() : formData.brand;
+    const finalModel = isCustomModel ? customModel.trim() : formData.model;
+    const payload = { ...formData, brand: finalBrand, model: finalModel } as PrinterType;
+    if (editingPrinter?.id) await StorageService.updatePrinter(payload);
+    else await StorageService.addPrinter({ ...payload, id: '', lastTonerDate: new Date().toISOString() });
+    window.history.back(); loadData();
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'ACTIVE': return 'bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.5)]';
-      case 'MAINTENANCE': return 'bg-orange-500 shadow-[0_0_15px_rgba(249,115,22,0.5)]';
-      case 'BROKEN': return 'bg-red-500 shadow-[0_0_15px_rgba(239,68,68,0.5)]';
-      case 'SPARE': return 'bg-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.5)]';
-      default: return 'bg-zinc-500';
+  const handleDelete = async (e: React.MouseEvent, printer: PrinterType) => {
+    e.stopPropagation();
+    if (confirm(`${printer.model} silinsin mi?`)) {
+       await StorageService.deletePrinter(printer.id);
+       loadData();
     }
   };
 
-  const filteredPrinters = printers.filter(p => {
+  // Performans için arama ve filtreleme belleğe alınıyor
+  const filteredPrinters = useMemo(() => {
     const s = searchTerm.toLocaleLowerCase('tr-TR');
-    return (p.model.toLocaleLowerCase('tr-TR').includes(s) || p.location.toLocaleLowerCase('tr-TR').includes(s) || p.shortCode?.includes(s) || p.serialNumber.toLocaleLowerCase('tr-TR').includes(s) || p.ipAddress?.includes(s));
-  });
+    return printers.filter(p => {
+      const matchSearch = (p.model.toLocaleLowerCase('tr-TR').includes(s) || p.location.toLocaleLowerCase('tr-TR').includes(s) || p.shortCode?.includes(s) || p.serialNumber.toLowerCase().includes(s));
+      const matchFloor = !selectedFloor || p.floor === selectedFloor;
+      const matchModel = !selectedModel || p.model === selectedModel;
+      return matchSearch && matchFloor && matchModel;
+    }).sort((a, b) => {
+      const nameA = a.location.toLocaleLowerCase('tr-TR'), nameB = b.location.toLocaleLowerCase('tr-TR');
+      return sortBy === 'AZ' ? nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
+    });
+  }, [printers, searchTerm, selectedFloor, selectedModel, sortBy]);
 
-  if (loading) return <LoadingScreen message="Sistem senkronize ediliyor..." />;
+  const floorOptions = useMemo(() => Array.from(new Set(printers.map(p => p.floor).filter(Boolean))).sort(), [printers]);
+  const modelOptions = useMemo(() => Array.from(new Set(printers.map(p => p.model).filter(Boolean))).sort(), [printers]);
+
+  if (loading && printers.length === 0) return <LoadingScreen message="Hızlı liste oluşturuluyor..." />;
 
   return (
-    <div className="space-y-8 pb-32">
+    <div className="space-y-8 pb-32 min-h-full">
       {/* Header Panel */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 bg-white dark:bg-zinc-950 p-8 rounded-[2rem] shadow-2xl border border-zinc-100 dark:border-zinc-900 overflow-hidden relative group transition-all">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 blur-3xl -mr-16 -mt-16"></div>
-        <div>
-          <h2 className="text-3xl font-black text-zinc-900 dark:text-white tracking-tighter uppercase">CİHAZ HAVUZU</h2>
-          <p className="text-sm font-bold text-zinc-400 mt-1 uppercase tracking-widest">{printers.length} Kayıtlı Cihaz</p>
+      <div className="bg-zinc-900/40 backdrop-blur-xl p-8 rounded-[3rem] border border-white/5 flex flex-col md:flex-row justify-between items-center gap-6 relative overflow-hidden shadow-xl">
+        <div className="absolute top-0 left-0 w-64 h-64 bg-emerald-500/5 blur-[80px] -ml-32 -mt-32"></div>
+        <div className="relative z-10 flex items-center gap-5">
+            <div className="p-4 bg-emerald-500/10 text-emerald-500 rounded-2xl border border-emerald-500/20"><PrinterIcon size={32} strokeWidth={2.5}/></div>
+            <div>
+                <h2 className="text-3xl font-black text-white tracking-tighter uppercase leading-none">CİHAZ HAVUZU</h2>
+                <p className="text-[10px] font-black text-emerald-500/60 mt-2 uppercase tracking-[0.4em]">{filteredPrinters.length} Kayıtlı Ünite</p>
+            </div>
         </div>
-        <div className="flex gap-3 w-full sm:w-auto relative z-10">
-            <button onClick={loadData} className="p-4 bg-zinc-100 dark:bg-zinc-900 rounded-2xl text-zinc-500 dark:text-zinc-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 transition-all active:scale-95"><RefreshCw size={24}/></button>
-            <button onClick={() => openFormModal()} className="flex-1 sm:flex-none bg-emerald-600 hover:bg-emerald-500 text-white px-8 py-4 rounded-2xl flex items-center justify-center gap-3 font-black shadow-xl shadow-emerald-500/20 transition-all active:scale-95"><Plus size={24} /> YENİ KAYIT</button>
+        <div className="flex gap-3 relative z-10 w-full md:w-auto">
+            <button onClick={() => setShowFilters(!showFilters)} className={`flex-1 md:flex-none p-4 rounded-2xl border border-white/5 transition-all flex items-center justify-center gap-2 font-black text-[9px] uppercase tracking-widest ${showFilters ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/5 text-zinc-400'}`}><Filter size={20} /></button>
+            <button onClick={() => setSortBy(sortBy === 'AZ' ? 'ZA' : 'AZ')} className="flex-1 md:flex-none p-4 bg-white/5 text-zinc-400 rounded-2xl border border-white/5 flex items-center justify-center gap-2 font-black text-[9px] uppercase tracking-widest">{sortBy === 'AZ' ? <SortAsc size={20} /> : <SortDesc size={20} />}</button>
+            <button onClick={(e) => openFormModal(e)} className="bg-emerald-600 hover:bg-emerald-500 text-white px-8 py-4 rounded-2xl flex items-center justify-center gap-3 font-black shadow-xl transition-all active:scale-95 uppercase text-[10px] tracking-widest"><Plus size={20} /> YENİ ÜNİTE</button>
         </div>
       </div>
 
-      {/* Search Bar */}
-      <div className="relative group">
-        <div className="absolute inset-y-0 left-0 pl-6 flex items-center pointer-events-none text-zinc-400 group-focus-within:text-emerald-500 transition-colors"><Search size={24} /></div>
-        <input type="text" placeholder="Hızlı Kod (#), Model, Seri No veya Lokasyon ara..." className="w-full pl-16 pr-8 py-6 rounded-[2rem] border-2 border-transparent bg-white dark:bg-zinc-950 text-zinc-900 dark:text-white shadow-xl focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all font-bold text-lg" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+      {/* Arama Barı */}
+      <div className="relative group mx-4 md:mx-0">
+          <div className="absolute inset-y-0 left-6 flex items-center pointer-events-none text-zinc-700 group-focus-within:text-emerald-500 transition-colors"><Search size={24} /></div>
+          <input 
+            type="text" 
+            placeholder="Model, Lokasyon veya Hızlı Kod ara..." 
+            className="w-full pl-16 pr-8 py-6 rounded-[2rem] bg-zinc-900/20 backdrop-blur-md border border-white/5 text-white shadow-xl outline-none focus:border-emerald-500/30 transition-all font-bold text-lg placeholder:text-zinc-700" 
+            value={searchTerm} 
+            onChange={(e) => setSearchTerm(e.target.value)} 
+          />
       </div>
 
-      {/* Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        {filteredPrinters.map(printer => (
-          <div key={printer.id} className="group rounded-[2.5rem] shadow-lg hover:shadow-2xl border border-zinc-100 dark:border-zinc-900 bg-white dark:bg-zinc-950 overflow-hidden transition-all duration-500 flex flex-col relative hover:-translate-y-2">
-            <div className={`absolute top-6 left-6 w-3 h-3 rounded-full ${getStatusBadge(printer.status)} z-20`}></div>
-            <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.history.pushState({modal:'qr'},''); setQrPrinter(printer); }} className="absolute top-5 right-5 p-3.5 bg-zinc-100/50 dark:bg-zinc-900/50 backdrop-blur-xl text-zinc-600 dark:text-zinc-400 rounded-2xl border border-zinc-200/50 dark:border-zinc-800 shadow-sm hover:text-emerald-500 hover:scale-110 transition-all z-10"><QrCode size={22} /></button>
-            <div className="p-8 flex-1 cursor-pointer active:opacity-90 transition-opacity" onClick={() => openHistoryModal(printer)}>
-              <div className="flex flex-col gap-4">
-                  <div className="space-y-1">
-                       <div className="flex items-center gap-2 text-zinc-900 dark:text-white font-black text-xs uppercase tracking-widest pl-5"><MapPin size={14} className="text-emerald-500" /> {printer.location}</div>
-                       <p className="text-[10px] text-zinc-400 font-bold uppercase pl-5 opacity-60">{printer.floor}</p>
+      {/* Filtre Paneli */}
+      {showFilters && (
+          <div className="mx-4 md:mx-0 bg-zinc-900/20 backdrop-blur-md p-6 rounded-[2rem] border border-white/5 grid grid-cols-1 md:grid-cols-2 gap-6 animate-in slide-in-from-top-2">
+              <div>
+                  <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-3 ml-1">KAT SEÇİMİ</p>
+                  <div className="flex flex-wrap gap-2">
+                      <button onClick={() => setSelectedFloor(null)} className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${!selectedFloor ? 'bg-emerald-600 text-white' : 'bg-white/5 text-zinc-600'}`}>TÜMÜ</button>
+                      {floorOptions.map(f => (
+                          <button key={f} onClick={() => setSelectedFloor(selectedFloor === f ? null : f)} className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${selectedFloor === f ? 'bg-emerald-600 text-white' : 'bg-white/5 text-zinc-600'}`}>{f}</button>
+                      ))}
                   </div>
-                  <div className="flex gap-4">
-                      <div className="flex-1">
-                          <h3 className="text-2xl font-black text-zinc-900 dark:text-white leading-tight group-hover:text-emerald-500 transition-colors">{printer.brand} {printer.model}</h3>
-                          <div className="flex flex-wrap gap-2 mt-4">
-                            <span className="text-xs font-black text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-3 py-1.5 rounded-xl border border-emerald-100 dark:border-emerald-900/50 tracking-widest">#{printer.shortCode}</span>
-                            {printer.connectionType === 'Network' ? (
-                                <span className="flex items-center gap-1.5 text-[10px] font-black text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 px-3 py-1.5 rounded-xl border border-blue-100 dark:border-blue-900/50 uppercase"><Wifi size={14}/> {printer.ipAddress}</span>
-                            ) : (
-                                <span className="flex items-center gap-1.5 text-[10px] font-black text-zinc-500 bg-zinc-50 dark:bg-zinc-900 px-3 py-1.5 rounded-xl uppercase border border-zinc-100 dark:border-zinc-800"><Usb size={14}/> USB</span>
-                            )}
+              </div>
+              <div>
+                  <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-3 ml-1">MODEL FİLTRESİ</p>
+                  <div className="flex flex-wrap gap-2">
+                      <button onClick={() => setSelectedModel(null)} className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${!selectedModel ? 'bg-emerald-600 text-white' : 'bg-white/5 text-zinc-600'}`}>TÜMÜ</button>
+                      {modelOptions.map(m => (
+                          <button key={m} onClick={() => setSelectedModel(selectedModel === m ? null : m)} className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${selectedModel === m ? 'bg-emerald-600 text-white' : 'bg-white/5 text-zinc-600'}`}>{m}</button>
+                      ))}
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {/* Grid Listesi */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 px-4 md:px-0">
+        {filteredPrinters.map(printer => (
+          <PrinterCard 
+            key={printer.id} 
+            printer={printer} 
+            onOpen={handleOpenDetail}
+            onEdit={openFormModal}
+            onDelete={handleDelete}
+            modelImage={config.modelImages?.[printer.model] || null}
+          />
+        ))}
+        {filteredPrinters.length === 0 && (
+          <div className="col-span-full py-20 flex flex-col items-center justify-center text-zinc-700 gap-4 opacity-50">
+             <PrinterIcon size={64} strokeWidth={1} />
+             <p className="font-black text-sm uppercase tracking-widest text-center px-10">Eşleşen ünite bulunamadı. Lütfen arama kriterlerini değiştirin.</p>
+          </div>
+        )}
+      </div>
+
+      {/* DETAY DRAWER */}
+      {selectedPrinter && (
+          <div className="fixed inset-0 z-[500] flex justify-end">
+              <div className="absolute inset-0 bg-black/90 backdrop-blur-md animate-in fade-in" onClick={() => window.history.back()}></div>
+              <div className="relative w-full max-w-xl bg-[#09090b] h-full shadow-2xl border-l border-white/5 animate-in slide-in-from-right duration-500 flex flex-col overflow-hidden">
+                  
+                  <div className="p-8 flex flex-col bg-zinc-950/50 border-b border-white/5 relative">
+                      <button onClick={() => window.history.back()} className="absolute top-6 right-6 p-4 bg-zinc-900 text-white rounded-2xl hover:bg-red-600 transition-all z-20"><X size={24} strokeWidth={3}/></button>
+                      <div className="flex flex-col md:flex-row gap-6 items-start mb-6">
+                          <div className="flex flex-col items-center gap-2 p-3 bg-white rounded-2xl shadow-xl border border-zinc-800 shrink-0">
+                              <img src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(window.location.origin + window.location.pathname + '?pid=' + selectedPrinter.id)}`} className="w-24 h-24" alt="QR"/>
+                              <div className="bg-zinc-950 text-emerald-500 px-3 py-1 rounded-lg font-black text-xs">#{selectedPrinter.shortCode}</div>
+                          </div>
+                          <div className="flex-1 pt-1">
+                              <span className="bg-emerald-500/10 text-emerald-500 px-3 py-1 rounded-lg text-[9px] font-black tracking-[0.3em] border border-emerald-500/20 uppercase mb-3 inline-block">CİHAZ PASAPORTU</span>
+                              <h3 className="text-3xl md:text-4xl font-black text-white tracking-tighter uppercase leading-none">{selectedPrinter.brand} {selectedPrinter.model}</h3>
+                              <p className="mt-3 text-zinc-500 font-bold uppercase tracking-widest flex items-center gap-2"><MapPin size={14} className="text-emerald-500"/> {selectedPrinter.location} — {selectedPrinter.floor}</p>
                           </div>
                       </div>
-                      {config.modelImages?.[printer.model] && <div className="w-24 h-24 shrink-0 flex items-center justify-center p-2 bg-zinc-50 dark:bg-zinc-900 rounded-3xl group-hover:rotate-3 transition-transform"><img src={config.modelImages[printer.model]} className="max-h-full w-full object-contain drop-shadow-2xl" /></div>}
                   </div>
-              </div>
-              <div className="mt-8 pt-6 border-t border-zinc-100 dark:border-zinc-900 flex justify-between items-center">
-                  <div className="flex flex-col">
-                      <span className="text-[10px] text-zinc-400 font-black uppercase tracking-widest">Güncel Sayaç</span>
-                      <span className="text-xl font-mono font-black text-zinc-900 dark:text-white">{printer.lastCounter.toLocaleString()}</span>
+
+                  <div className="flex-1 overflow-y-auto p-10 space-y-12 custom-scrollbar">
+                      <div className="grid grid-cols-3 gap-4">
+                          <div className="bg-zinc-900/40 p-6 rounded-2xl border border-white/5 text-center"><p className="text-[9px] font-black text-zinc-600 uppercase mb-1.5">SAYAÇ</p><p className="text-xl font-black text-white font-mono">{selectedPrinter.lastCounter.toLocaleString()}</p></div>
+                          <div className="bg-zinc-900/40 p-6 rounded-2xl border border-white/5 text-center"><p className="text-[9px] font-black text-zinc-600 uppercase mb-1.5">MALİYET</p><p className="text-xl font-black text-emerald-500 font-mono">{printerServices.reduce((a,c)=>a+(c.cost||0),0).toLocaleString()} ₺</p></div>
+                          <div className="bg-zinc-900/40 p-6 rounded-2xl border border-white/5 text-center"><p className="text-[9px] font-black text-zinc-600 uppercase mb-1.5">TONER</p><p className="text-xl font-black text-orange-500 font-mono">{printerTonerLogs.length}</p></div>
+                      </div>
+
+                      {/* TONER DEĞİŞİM GEÇMİŞİ */}
+                      <div className="space-y-6">
+                          <h4 className="flex items-center gap-3 text-white font-black text-lg uppercase tracking-tighter"><Droplet size={24} className="text-orange-500"/> TONER DEĞİŞİM GEÇMİŞİ</h4>
+                          <div className="space-y-3">
+                              {printerTonerLogs.map(log => (
+                                  <div key={log.id} className="bg-zinc-900/40 p-6 rounded-2xl border border-white/5 relative group/row overflow-hidden">
+                                      <div className="absolute left-0 top-0 bottom-0 w-1 bg-orange-500"></div>
+                                      <div className="flex justify-between items-start mb-1">
+                                          <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">{new Date(log.date).toLocaleDateString()}</span>
+                                          <span className="text-xs font-black text-white bg-zinc-800 px-2 py-0.5 rounded-lg">{log.tonerModel}</span>
+                                      </div>
+                                      <h5 className="text-sm font-black text-zinc-300 uppercase leading-tight mb-1">{log.description}</h5>
+                                      <div className="flex justify-between items-center text-[8px] font-black text-zinc-600">
+                                          <span>SAAT: {new Date(log.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                                          <span>TEKNİSYEN: {log.user}</span>
+                                      </div>
+                                  </div>
+                              ))}
+                              {printerTonerLogs.length === 0 && (
+                                  <div className="py-8 bg-zinc-900/20 border border-dashed border-zinc-800 rounded-3xl text-center">
+                                      <p className="text-zinc-700 font-black uppercase text-[10px]">Henüz toner değişimi kaydedilmedi.</p>
+                                  </div>
+                              )}
+                          </div>
+                      </div>
+
+                      <div className="space-y-6">
+                          <h4 className="flex items-center gap-3 text-white font-black text-lg uppercase tracking-tighter"><StickyNote size={24} className="text-blue-500"/> CİHAZ NOTLARI</h4>
+                          <div className="space-y-3">
+                              {printerNotes.map(note => (
+                                  <div key={note.id} className="bg-zinc-900/20 p-5 rounded-2xl border border-white/5">
+                                      <h5 className="font-black text-white uppercase text-xs mb-1.5">{note.title}</h5>
+                                      <p className="text-zinc-500 text-xs leading-relaxed">{note.content}</p>
+                                      <div className="mt-3 flex justify-between items-center text-[8px] font-black text-zinc-700">
+                                          <span>{new Date(note.date).toLocaleDateString()}</span>
+                                          <span>Yazar: {note.user}</span>
+                                      </div>
+                                  </div>
+                              ))}
+                              {printerNotes.length === 0 && <p className="text-zinc-800 text-center font-black uppercase text-[10px]">Cihaza bağlı not bulunmuyor.</p>}
+                          </div>
+                      </div>
+
+                      <div className="space-y-6">
+                          <h4 className="flex items-center gap-3 text-white font-black text-lg uppercase tracking-tighter"><Wrench size={24} className="text-emerald-500"/> SERVİS GEÇMİŞİ</h4>
+                          {printerServices.map(s => (
+                              <div key={s.id} className="bg-zinc-900/40 p-6 rounded-2xl border border-white/5 relative group/row overflow-hidden">
+                                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500"></div>
+                                  <div className="flex justify-between items-start mb-3">
+                                      <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">{new Date(s.date).toLocaleDateString()}</span>
+                                      <span className="text-lg font-black text-white">{s.cost.toLocaleString()} ₺</span>
+                                  </div>
+                                  <h5 className="text-base font-black text-white uppercase mb-1">{s.issue}</h5>
+                                  <p className="text-xs text-zinc-500 font-medium">{s.actionTaken}</p>
+                              </div>
+                          ))}
+                      </div>
                   </div>
-                  <div className="bg-emerald-50 dark:bg-emerald-950 p-3 rounded-2xl text-emerald-500 group-hover:scale-110 transition-transform"><TrendingUp size={24}/></div>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 border-t border-zinc-100 dark:border-zinc-900 bg-zinc-50/50 dark:bg-zinc-900/50">
-                <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); openFormModal(printer); }} className="py-6 flex items-center justify-center gap-2 text-zinc-500 dark:text-zinc-400 font-black text-xs uppercase tracking-widest hover:bg-emerald-50 dark:hover:bg-emerald-950 hover:text-emerald-600 transition-all border-r border-zinc-100 dark:border-zinc-900"><Edit2 size={18} /> DÜZENLE</button>
-                <button onClick={(e) => confirmDelete(e, printer.id)} className="py-6 flex items-center justify-center gap-2 text-zinc-500 dark:text-zinc-400 font-black text-xs uppercase tracking-widest hover:bg-red-50 dark:hover:bg-red-950 hover:text-red-500 transition-all"><Trash2 size={18} /> SİL</button>
-            </div>
-          </div>
-        ))}
-      </div>
-
-       {/* HISTORY DRAWER - REFRESHED V3.0 */}
-       {isHistoryModalOpen && selectedPrinterHistory && (
-         <div className="fixed inset-0 z-[120] flex justify-end">
-             <div className="absolute inset-0 bg-black/90 backdrop-blur-xl animate-in fade-in duration-300" onClick={() => window.history.back()}></div>
-             <div className="relative w-full max-w-2xl bg-white dark:bg-zinc-950 h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-500 overflow-hidden">
-                 {/* Detail Header */}
-                 <div className="p-10 bg-zinc-50 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 flex justify-between items-start">
-                     <div>
-                        <div className="flex items-center gap-3 mb-4">
-                           <span className="bg-emerald-600 text-white px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-[0.3em] shadow-[0_0_20px_rgba(16,185,129,0.3)]">#{selectedPrinterHistory.printer.shortCode}</span>
-                           <span className="text-zinc-400 text-xs font-mono font-black tracking-widest">{selectedPrinterHistory.printer.serialNumber}</span>
-                        </div>
-                        <h3 className="text-4xl font-black text-zinc-900 dark:text-white leading-none tracking-tighter uppercase">{selectedPrinterHistory.printer.brand} {selectedPrinterHistory.printer.model}</h3>
-                        <div className="flex flex-wrap items-center gap-3 mt-5">
-                           <p className="text-emerald-600 dark:text-emerald-400 font-black text-xs flex items-center gap-2 bg-emerald-50 dark:bg-emerald-950 p-2.5 rounded-2xl border border-emerald-100 dark:border-emerald-900"><MapPin size={18}/> {selectedPrinterHistory.printer.location} ({selectedPrinterHistory.printer.floor})</p>
-                           {selectedPrinterHistory.printer.connectionType === 'Network' ? (
-                               <p className="text-blue-600 dark:text-blue-400 font-black text-xs flex items-center gap-2 bg-blue-50 dark:bg-blue-950 p-2.5 rounded-2xl border border-blue-100 dark:border-blue-900"><Globe size={18}/> {selectedPrinterHistory.printer.ipAddress}</p>
-                           ) : (
-                               <p className="text-zinc-500 dark:text-zinc-400 font-black text-xs flex items-center gap-2 bg-zinc-100 dark:bg-zinc-800 p-2.5 rounded-2xl border border-zinc-200 dark:border-zinc-700"><Usb size={18}/> USB BAĞLANTI</p>
-                           )}
-                        </div>
-                     </div>
-                     <button onClick={() => window.history.back()} className="p-4 bg-white dark:bg-zinc-800 rounded-[1.5rem] text-zinc-400 hover:text-red-500 shadow-2xl transition-all active:scale-90"><X size={32}/></button>
-                 </div>
-
-                 <div className="flex-1 overflow-y-auto p-10 space-y-12 custom-scrollbar bg-zinc-50/20 dark:bg-black">
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-6">
-                        <div className="bg-white dark:bg-zinc-900 p-6 rounded-[2rem] border border-zinc-200 dark:border-zinc-800 shadow-sm hover:border-emerald-500 transition-colors">
-                            <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-3">TOPLAM ENDEKS</p>
-                            <p className="text-3xl font-black text-zinc-900 dark:text-white font-mono">{selectedPrinterHistory.printer.lastCounter.toLocaleString()}</p>
-                        </div>
-                        <div className="bg-white dark:bg-zinc-900 p-6 rounded-[2rem] border border-zinc-200 dark:border-zinc-800 shadow-sm">
-                            <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-3">SİSTEM MALİYETİ</p>
-                            <p className="text-3xl font-black text-emerald-600 font-mono">{selectedPrinterHistory.stats.totalSpent.toLocaleString()} ₺</p>
-                        </div>
-                        <div className="bg-white dark:bg-zinc-900 p-6 rounded-[2rem] border border-zinc-200 dark:border-zinc-800 shadow-sm col-span-2 sm:col-span-1">
-                            <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-3">TONER DEĞİŞİMİ</p>
-                            <p className="text-3xl font-black text-orange-500 font-mono">{selectedPrinterHistory.stats.tonerCount}</p>
-                        </div>
-                    </div>
-
-                    <section>
-                        <h4 className="flex items-center gap-3 text-2xl font-black text-zinc-900 dark:text-white mb-8 pl-2 uppercase tracking-tighter"><Droplet size={28} className="text-orange-500" /> TONER ARŞİVİ</h4>
-                        <div className="space-y-4">
-                            {selectedPrinterHistory.tonerLogs.length === 0 ? <p className="text-zinc-400 font-bold p-10 bg-zinc-100 dark:bg-zinc-900 rounded-3xl text-center">Henüz veri girişi yapılmamış.</p> : 
-                                selectedPrinterHistory.tonerLogs.map(log => (
-                                    <div key={log.id} className="bg-white dark:bg-zinc-900 p-6 rounded-3xl border border-zinc-100 dark:border-zinc-800 flex justify-between items-center group hover:border-orange-500 transition-all">
-                                        <div className="flex items-center gap-4">
-                                            <div className="p-4 bg-orange-50 dark:bg-orange-950 text-orange-600 rounded-2xl"><Droplet size={24}/></div>
-                                            <div>
-                                                <p className="font-black text-zinc-900 dark:text-white text-xl uppercase tracking-tight">{log.tonerModel}</p>
-                                                <div className="flex items-center gap-4 mt-1">
-                                                    <p className="text-xs text-zinc-400 font-bold flex items-center gap-1.5"><Calendar size={14}/> {new Date(log.date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
-                                                    <p className="text-xs text-zinc-400 font-bold flex items-center gap-1.5"><UserIcon size={14}/> {log.user}</p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div className="text-right">
-                                            {log.cost ? <p className="text-sm font-black text-emerald-500">{log.cost.toLocaleString()} ₺</p> : <p className="text-[10px] text-zinc-400 font-black">STOKTAN</p>}
-                                        </div>
-                                    </div>
-                                ))
-                            }
-                        </div>
-                    </section>
-
-                    <section>
-                        <h4 className="flex items-center gap-3 text-2xl font-black text-zinc-900 dark:text-white mb-8 pl-2 uppercase tracking-tighter"><Wrench size={28} className="text-blue-500" /> TEKNİK KAYITLAR</h4>
-                        <div className="space-y-6">
-                            {selectedPrinterHistory.serviceLogs.length === 0 ? <p className="text-zinc-400 font-bold p-10 bg-zinc-100 dark:bg-zinc-900 rounded-3xl text-center">Cihaza ait servis kaydı yok.</p> : 
-                                selectedPrinterHistory.serviceLogs.map(srv => (
-                                    <div key={srv.id} className="bg-white dark:bg-zinc-900 p-8 rounded-[2rem] border-l-[8px] border-blue-500 shadow-xl group hover:scale-[1.01] transition-transform">
-                                        <div className="flex justify-between items-start mb-4">
-                                            <span className={`text-[10px] font-black px-4 py-1.5 rounded-full tracking-[0.2em] shadow-sm ${srv.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-700' : 'bg-orange-100 text-orange-700'}`}>{srv.status}</span>
-                                            <span className="text-xs text-zinc-400 font-black flex items-center gap-1.5"><Clock size={14}/> {new Date(srv.date).toLocaleDateString('tr-TR')}</span>
-                                        </div>
-                                        <p className="font-black text-zinc-900 dark:text-white text-xl mb-2 uppercase">{srv.issue}</p>
-                                        <p className="text-sm text-zinc-500 dark:text-zinc-400 font-bold leading-relaxed">{srv.actionTaken}</p>
-                                        <div className="mt-8 pt-6 border-t border-zinc-100 dark:border-zinc-800 flex justify-between items-center">
-                                            <div>
-                                                <p className="text-[10px] text-zinc-400 font-black uppercase tracking-widest mb-1">Servis Sağlayıcı</p>
-                                                <p className="text-xs font-black text-zinc-700 dark:text-zinc-300">{srv.provider}</p>
-                                            </div>
-                                            <p className="font-black text-2xl text-blue-600 dark:text-blue-400 font-mono">{srv.cost.toLocaleString()} ₺</p>
-                                        </div>
-                                    </div>
-                                ))
-                            }
-                        </div>
-                    </section>
-
-                    <section>
-                         <h4 className="flex items-center gap-3 text-2xl font-black text-zinc-900 dark:text-white mb-8 pl-2 uppercase tracking-tighter"><Calculator size={28} className="text-purple-500" /> ENDEKS ANALİZİ</h4>
-                         <div className="bg-white dark:bg-zinc-900 rounded-[2.5rem] border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-sm">
-                             <table className="w-full text-left">
-                                 <thead className="bg-zinc-50 dark:bg-zinc-900/50">
-                                     <tr>
-                                         <th className="p-5 text-[10px] text-zinc-400 font-black uppercase tracking-widest">Tarih</th>
-                                         <th className="p-5 text-[10px] text-zinc-400 font-black uppercase tracking-widest text-center">Sayaç</th>
-                                         <th className="p-5 text-[10px] text-zinc-400 font-black uppercase tracking-widest text-right">Fark</th>
-                                     </tr>
-                                 </thead>
-                                 <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
-                                     {selectedPrinterHistory.counterLogs.length === 0 ? (
-                                         <tr><td colSpan={3} className="p-12 text-center text-zinc-400 font-bold">Sayaç verisi bulunamadı.</td></tr>
-                                     ) : (
-                                         selectedPrinterHistory.counterLogs.map(log => (
-                                             <tr key={log.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors">
-                                                 <td className="p-5 text-sm font-bold text-zinc-600 dark:text-zinc-400">{new Date(log.date).toLocaleDateString('tr-TR')}</td>
-                                                 <td className="p-5 text-center font-black text-zinc-900 dark:text-white font-mono">{log.currentCounter.toLocaleString()}</td>
-                                                 <td className="p-5 text-right text-emerald-600 font-black font-mono">+{log.usage.toLocaleString()}</td>
-                                             </tr>
-                                         ))
-                                     )}
-                                 </tbody>
-                             </table>
-                         </div>
-                    </section>
-                 </div>
-                 
-                 <div className="p-8 bg-white dark:bg-zinc-950 border-t border-zinc-200 dark:border-zinc-800 flex gap-4 pb-[env(safe-area-inset-bottom)]">
-                     <button onClick={() => { window.history.back(); openFormModal(selectedPrinterHistory.printer); }} className="flex-1 py-6 bg-zinc-100 dark:bg-zinc-900 text-zinc-800 dark:text-white rounded-3xl font-black text-xs tracking-widest flex items-center justify-center gap-3 transition-all active:scale-95 border border-zinc-200 dark:border-zinc-800 uppercase">DÜZENLE</button>
-                     <button onClick={() => window.history.back()} className="flex-1 py-6 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-3xl font-black text-xs tracking-widest active:scale-95 shadow-2xl uppercase">KAPAT</button>
-                 </div>
-             </div>
-         </div>
-       )}
-
-       {/* QR MODAL (Aynı şekilde v3'e uyarlandı) */}
-       {qrPrinter && (
-          <div className="fixed inset-0 bg-black/95 backdrop-blur-3xl z-[200] flex items-center justify-center p-6 animate-in fade-in duration-500">
-              <div className="bg-white dark:bg-zinc-900 rounded-[4rem] w-full max-w-sm overflow-hidden shadow-[0_40px_80px_-20px_rgba(0,0,0,0.8)] relative animate-in zoom-in-95 duration-500 border border-zinc-200 dark:border-zinc-800">
-                  <button onClick={() => window.history.back()} className="absolute top-8 right-8 p-4 bg-zinc-100 dark:bg-zinc-800 rounded-2xl text-zinc-500 hover:text-red-500 transition-all active:scale-90"><X size={28}/></button>
-                  <div className="p-12 flex flex-col items-center text-center">
-                      <div className="mb-10 bg-white p-8 rounded-[3.5rem] shadow-2xl border-2 border-zinc-50 dark:border-zinc-800">
-                          <img src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(window.location.origin + window.location.pathname + '?pid=' + qrPrinter.id + '&sc=' + (qrPrinter.shortCode || ''))}`} alt="QR" className="w-48 h-48 object-contain" />
-                      </div>
-                      <h3 className="text-3xl font-black text-zinc-900 dark:text-white mb-2 leading-tight uppercase tracking-tighter">{qrPrinter.brand} {qrPrinter.model}</h3>
-                      <p className="text-emerald-500 font-black mb-10 flex items-center gap-2 tracking-widest text-xs uppercase"><MapPin size={18}/> {qrPrinter.location}</p>
-                      <div className="w-full bg-zinc-900 dark:bg-emerald-950/40 p-8 rounded-[2.5rem] mb-10 border border-emerald-500/20">
-                          <p className="text-[10px] text-emerald-500 font-black uppercase tracking-[0.4em] mb-3">HIZLI ERİŞİM</p>
-                          <span className="text-6xl font-black text-white dark:text-emerald-400 tracking-tighter">#{qrPrinter.shortCode}</span>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4 w-full">
-                          <button onClick={() => window.print()} className="py-5 bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white rounded-3xl font-black text-xs tracking-widest active:scale-95 uppercase">YAZDIR</button>
-                          <button onClick={() => { navigator.clipboard.writeText(qrPrinter.shortCode || ''); alert('Kopyalandı!'); }} className="py-5 bg-emerald-600 text-white rounded-3xl font-black text-xs tracking-widest shadow-lg shadow-emerald-500/20 active:scale-95 uppercase">KOPYALA</button>
-                      </div>
+                  
+                  <div className="p-10 bg-zinc-950 border-t border-white/5 grid grid-cols-2 gap-4">
+                      <button onClick={(e) => openFormModal(e, selectedPrinter)} className="py-6 bg-zinc-900 text-white rounded-2xl font-black uppercase text-[10px] tracking-[0.3em]">DÜZENLE</button>
+                      <button onClick={() => window.history.back()} className="py-6 bg-white text-black rounded-2xl font-black uppercase text-[10px] tracking-[0.3em]">KAPAT</button>
                   </div>
               </div>
           </div>
-       )}
+      )}
+
+      {/* Form Modal */}
+      {isFormModalOpen && (
+        <div className="fixed inset-0 bg-black/95 backdrop-blur-xl z-[600] flex items-center justify-center p-6 animate-in fade-in duration-300">
+          <div className="bg-[#09090b] rounded-[3rem] w-full max-w-xl shadow-2xl overflow-hidden animate-in zoom-in-95 border border-white/5 flex flex-col max-h-[90vh]">
+            <div className="p-8 border-b border-white/5 flex justify-between items-center bg-zinc-950/50">
+              <h3 className="font-black text-3xl text-white tracking-tighter uppercase leading-none">{editingPrinter ? 'CİHAZ GÜNCELLE' : 'YENİ ÜNİTE EKLE'}</h3>
+              <button onClick={() => window.history.back()} className="p-4 bg-red-600 text-white rounded-2xl shadow-xl hover:rotate-90 transition-all active:scale-90"><X size={24} strokeWidth={3} /></button>
+            </div>
+            
+            <form onSubmit={handleSave} className="p-10 space-y-6 overflow-y-auto custom-scrollbar">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-2">MARKA</label>
+                    <select className="w-full p-4 border border-white/10 rounded-2xl bg-zinc-900 text-white font-black outline-none focus:border-emerald-500" value={formData.brand} onChange={e => setFormData({...formData, brand: e.target.value})}>
+                      {config.brands.map(b => <option key={b} value={b}>{b}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-3">
+                    <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-2">MODEL</label>
+                    <select className="w-full p-4 border border-white/10 rounded-2xl bg-zinc-900 text-white font-black outline-none focus:border-emerald-500" value={formData.model} onChange={e => setFormData({...formData, model: e.target.value})}>
+                      {config.models.map(m => <option key={m} value={m}>{m}</option>)}
+                    </select>
+                  </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-2">SERİ NUMARASI</label>
+                  <input required type="text" className="w-full p-4 border border-white/10 rounded-2xl bg-zinc-900 text-white font-black outline-none focus:border-emerald-500" value={formData.serialNumber} onChange={e => setFormData({...formData, serialNumber: e.target.value})} />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-2">LOKASYON</label>
+                  <input required type="text" className="w-full p-4 border border-white/10 rounded-2xl bg-zinc-900 text-white font-black outline-none focus:border-emerald-500" placeholder="Örn: MUHASEBE, RADYOLOJİ..." value={formData.location} onChange={e => setFormData({...formData, location: e.target.value})} />
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-2">KAT / BÖLÜM</label>
+                <input required type="text" className="w-full p-4 border border-white/10 rounded-2xl bg-zinc-900 text-white font-black outline-none focus:border-emerald-500" placeholder="Örn: 2. Kat, Zemin, Laboratuvar..." value={formData.floor} onChange={e => setFormData({...formData, floor: e.target.value})} />
+              </div>
+
+              <button type="submit" className="w-full py-6 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-black shadow-xl transition-all uppercase tracking-widest mt-4">SİSTEME KAYDET</button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, Save, Tag, Box, MessageCircle, Truck, RefreshCw, Edit2, X, AlertTriangle, Droplet, Database, CheckCircle2, Loader2, ArrowRight, Image as ImageIcon, Link as LinkIcon, Printer, ShieldCheck } from 'lucide-react';
 import { StorageService } from '../services/storage';
@@ -129,7 +130,9 @@ export const Settings: React.FC = () => {
                 ipAddress,
                 supplier: 'Anahtar Bilgisayar',
                 status: 'ACTIVE',
-                connectedUsers: []
+                connectedUsers: [],
+                // Fix: Add missing monthlyRentalCost property to satisfy Printer interface
+                monthlyRentalCost: 0
             };
             await StorageService.addPrinter(newPrinter);
             count++;

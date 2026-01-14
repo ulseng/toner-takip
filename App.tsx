@@ -13,7 +13,9 @@ import { QrScanner } from './components/QrScanner';
 import { Inventory } from './components/Inventory';
 import { CounterManagement } from './components/CounterManagement';
 import { Notes } from './components/Notes';
+import { Invoices } from './components/Invoices';
 import { User } from './types';
+import { StorageService } from './services/storage';
 
 function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -28,9 +30,20 @@ function App() {
     const savedTheme = localStorage.getItem('app_theme');
     if (savedTheme === 'dark') setIsDarkMode(true);
 
-    const params = new URLSearchParams(window.location.search);
-    const pid = params.get('pid');
-    if (pid) setTargetPrinterId(pid);
+    const resolveUrlParams = async () => {
+      const params = new URLSearchParams(window.location.search);
+      const pid = params.get('pid');
+      const sc = params.get('sc');
+
+      if (pid) {
+        setTargetPrinterId(pid);
+      } else if (sc) {
+        const printer = await StorageService.findPrinterByShortCode(sc);
+        if (printer) setTargetPrinterId(printer.id);
+      }
+    };
+
+    resolveUrlParams();
   }, []);
 
   useEffect(() => {
@@ -74,14 +87,15 @@ function App() {
         isDarkMode={isDarkMode}
         toggleTheme={toggleTheme}
       >
-        {activeTab === 'dashboard' && <Dashboard />}
+        {activeTab === 'dashboard' && <Dashboard setActiveTab={setActiveTab} />}
+        {activeTab === 'invoices' && <Invoices />}
         {activeTab === 'scan' && <QrScanner />}
         {activeTab === 'qr' && <QrManagement />}
         {activeTab === 'notes' && <Notes user={user} />}
         {activeTab === 'printers' && <PrinterList targetPrinterId={targetPrinterId} clearTarget={() => setTargetPrinterId(null)} />}
         {activeTab === 'inventory' && <Inventory />} 
         {activeTab === 'counters' && <CounterManagement user={user} />}
-        {activeTab === 'service' && <ServiceManagement />}
+        {activeTab === 'service' && <ServiceManagement user={user} />}
         {activeTab === 'stock' && <StockManagement user={user} />}
         {activeTab === 'history' && <History />}
         {activeTab === 'settings' && <Settings />}

@@ -1,7 +1,7 @@
 
 import { db } from './firebase';
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, setDoc, query, orderBy, getDoc, absenteeism, where, writeBatch } from 'firebase/firestore';
-import { Printer, TonerStock, StockLog, SystemConfig, ServiceRecord, User, CounterLog, Note } from '../types';
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, setDoc, query, orderBy, getDoc, where, writeBatch } from 'firebase/firestore';
+import { Printer, TonerStock, StockLog, SystemConfig, ServiceRecord, User, CounterLog, Note, ActivityLog, MonthlyInvoice, InvoiceRecord } from '../types';
 
 const COLLECTIONS = {
   PRINTERS: 'printers',
@@ -11,7 +11,10 @@ const COLLECTIONS = {
   SERVICES: 'services',
   USERS: 'users',
   COUNTERS: 'counters',
-  NOTES: 'notes'
+  NOTES: 'notes',
+  ACTIVITIES: 'activities',
+  MONTHLY_INVOICES: 'monthly_invoices',
+  INVOICES: 'invoices'
 };
 
 const INITIAL_CONFIG: SystemConfig = {
@@ -33,6 +36,47 @@ const cleanData = (data: any) => {
 };
 
 export const StorageService = {
+  // --- INVOICES ---
+  getInvoices: async (): Promise<InvoiceRecord[]> => {
+    try {
+      const snapshot = await getDocs(collection(db, COLLECTIONS.INVOICES));
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as any } as InvoiceRecord));
+    } catch (e) { return []; }
+  },
+
+  addInvoice: async (invoice: InvoiceRecord) => {
+    const { id, ...data } = invoice;
+    return await addDoc(collection(db, COLLECTIONS.INVOICES), cleanData(data));
+  },
+
+  updateInvoice: async (invoice: InvoiceRecord) => {
+    if (!invoice.id) return;
+    const { id, ...data } = invoice;
+    await updateDoc(doc(db, COLLECTIONS.INVOICES, id), cleanData(data));
+  },
+
+  // --- MONTHLY INVOICES ---
+  getMonthlyInvoices: async (): Promise<MonthlyInvoice[]> => {
+    try {
+      const snapshot = await getDocs(collection(db, COLLECTIONS.MONTHLY_INVOICES));
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as any } as MonthlyInvoice));
+    } catch (e) { return []; }
+  },
+
+  saveMonthlyInvoice: async (invoice: MonthlyInvoice) => {
+    const { id, ...data } = invoice;
+    if (id) {
+      await updateDoc(doc(db, COLLECTIONS.MONTHLY_INVOICES, id), cleanData(data));
+    } else {
+      await addDoc(collection(db, COLLECTIONS.MONTHLY_INVOICES), cleanData(data));
+    }
+  },
+
+  deleteMonthlyInvoice: async (id: string) => {
+    if (!id) throw new Error("ID required");
+    await deleteDoc(doc(db, COLLECTIONS.MONTHLY_INVOICES, id));
+  },
+
   // --- AUTH ---
   getUsers: async (): Promise<User[]> => {
     try {
@@ -110,13 +154,56 @@ export const StorageService = {
     } catch (e) { return []; }
   },
 
-  addNote: async (note: Note) => {
-    const { id, ...data } = note;
-    await addDoc(collection(db, COLLECTIONS.NOTES), cleanData(data));
+  getNotesByPrinter: async (printerId: string): Promise<Note[]> => {
+    try {
+      const q = query(collection(db, COLLECTIONS.NOTES), where('printerId', '==', printerId), orderBy('date', 'desc'));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as any } as Note));
+    } catch (e) { return []; }
   },
 
-  deleteNote: async (id: string) => {
+  addNote: async (note: Note) => {
+    const { id, ...data } = note;
+    const docRef = await addDoc(collection(db, COLLECTIONS.NOTES), cleanData(data));
+    await StorageService.addActivity({
+      id: '',
+      date: new Date().toISOString(),
+      user: note.user,
+      action: 'NOT_EKLENDI',
+      details: `"${note.title}" başlıklı yeni bir not oluşturuldu.`
+    });
+    return docRef.id;
+  },
+
+  updateNote: async (note: Note) => {
+    if (!note.id) return;
+    const { id, ...data } = note;
+    await updateDoc(doc(db, COLLECTIONS.NOTES, id), cleanData(data));
+  },
+
+  deleteNote: async (id: string, user: string, title: string) => {
     await deleteDoc(doc(db, COLLECTIONS.NOTES, id));
+    await StorageService.addActivity({
+      id: '',
+      date: new Date().toISOString(),
+      user: user,
+      action: 'NOT_SILINDI',
+      details: `"${title}" başlıklı not silindi.`
+    });
+  },
+
+  // --- ACTIVITIES ---
+  getActivities: async (): Promise<ActivityLog[]> => {
+    try {
+      const q = query(collection(db, COLLECTIONS.ACTIVITIES), orderBy('date', 'desc'));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as any } as ActivityLog));
+    } catch (e) { return []; }
+  },
+
+  addActivity: async (activity: ActivityLog) => {
+    const { id, ...data } = activity;
+    await addDoc(collection(db, COLLECTIONS.ACTIVITIES), cleanData(data));
   },
 
   // --- STOCKS & LOGS ---
@@ -144,17 +231,30 @@ export const StorageService = {
     await addDoc(collection(db, COLLECTIONS.LOGS), cleanData(data));
   },
 
+  // --- SERVICES ---
   getServiceRecords: async (): Promise<ServiceRecord[]> => {
     const q = query(collection(db, COLLECTIONS.SERVICES), orderBy('date', 'desc'));
     const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as any } as ServiceRecord));
   },
 
-  addServiceRecord: async (record: ServiceRecord) => {
+  addServiceRecord: async (record: ServiceRecord, user: string) => {
     const { id, ...data } = record;
-    await addDoc(collection(db, COLLECTIONS.SERVICES), cleanData(data));
+    const docRef = await addDoc(collection(db, COLLECTIONS.SERVICES), cleanData(data));
+    return docRef.id;
   },
 
+  updateServiceRecord: async (record: ServiceRecord, user: string) => {
+    if (!record.id) return;
+    const { id, ...data } = record;
+    await updateDoc(doc(db, COLLECTIONS.SERVICES, id), cleanData({ ...data, lastModifiedBy: user }));
+  },
+
+  deleteServiceRecord: async (id: string, user: string, printerName: string) => {
+    await deleteDoc(doc(db, COLLECTIONS.SERVICES, id));
+  },
+
+  // --- COUNTERS ---
   getCounterLogs: async (): Promise<CounterLog[]> => {
     const q = query(collection(db, COLLECTIONS.COUNTERS), orderBy('date', 'desc'));
     const snapshot = await getDocs(q);
@@ -173,6 +273,24 @@ export const StorageService = {
     }
   },
 
+  // Implementation for simulation fetching counter data
+  fetchPrinterCounterSimulated: async (printer: Printer) => {
+    await new Promise(resolve => setTimeout(resolve, 800));
+    const base = printer.lastCounter || 0;
+    const increment = Math.floor(Math.random() * 500) + 50;
+    const total = base + increment;
+    
+    if (printer.isColor) {
+      const bwBase = printer.lastCounterBW || Math.floor(base * 0.7);
+      const colorBase = printer.lastCounterColor || Math.floor(base * 0.3);
+      const bwInc = Math.floor(increment * 0.8);
+      const colorInc = increment - bwInc;
+      return { total, bw: bwBase + bwInc, color: colorBase + colorInc };
+    }
+    
+    return { total, bw: total, color: 0 };
+  },
+
   getConfig: async (): Promise<SystemConfig> => {
     const docSnap = await getDoc(doc(db, COLLECTIONS.CONFIG, 'main_config'));
     return docSnap.exists() ? { ...INITIAL_CONFIG, ...docSnap.data() as SystemConfig } : INITIAL_CONFIG;
@@ -180,18 +298,5 @@ export const StorageService = {
 
   saveConfig: async (config: SystemConfig) => {
     await setDoc(doc(db, COLLECTIONS.CONFIG, 'main_config'), cleanData(config));
-  },
-  
-  // Fix: Return an object containing total, bw, and color properties to match expected usage in CounterManagement.tsx
-  fetchPrinterCounterSimulated: async (printer: Printer) => {
-    await new Promise(r => setTimeout(r, 1000));
-    const inc = Math.floor(Math.random() * 50) + 10;
-    const bwInc = Math.floor(inc * 0.7);
-    const colorInc = inc - bwInc;
-    return { 
-      total: printer.lastCounter + inc, 
-      bw: (printer.lastCounterBW || 0) + bwInc,
-      color: printer.isColor ? (printer.lastCounterColor || 0) + colorInc : 0
-    };
   }
 };

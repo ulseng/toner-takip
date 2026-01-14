@@ -1,11 +1,15 @@
+
 import React, { useEffect, useState } from 'react';
 import { StorageService } from '../services/storage';
 import { Printer, TonerStock, StockLog, ServiceRecord } from '../types';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, BarChart, Bar, XAxis, YAxis } from 'recharts';
-import { AlertCircle, CheckCircle2, Clock, Printer as PrinterIcon, Wallet, Wrench, RefreshCw, TrendingUp, TrendingDown } from 'lucide-react';
+import { Printer as PrinterIcon, Wrench, RefreshCw, Activity, Package, Clock, ShieldAlert, Calendar } from 'lucide-react';
 import { LoadingScreen } from './LoadingScreen';
 
-export const Dashboard: React.FC = () => {
+interface DashboardProps {
+    setActiveTab?: (tab: string) => void;
+}
+
+export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab }) => {
   const [printers, setPrinters] = useState<Printer[]>([]);
   const [stocks, setStocks] = useState<TonerStock[]>([]);
   const [logs, setLogs] = useState<StockLog[]>([]);
@@ -32,155 +36,144 @@ export const Dashboard: React.FC = () => {
   }, []);
 
   if (loading) {
-      return <LoadingScreen message="Özet raporlar hazırlanıyor..." />;
+      return <LoadingScreen message="Sistem durumu analiz ediliyor..." />;
   }
 
-  const totalPrinters = printers.length;
-  const totalStockItems = stocks.reduce((acc, curr) => acc + curr.quantity, 0);
-  const lowStockItems = stocks.filter(s => s.quantity < 3);
-
-  // Financial Calcs
-  const totalServiceCost = services.reduce((acc, curr) => acc + (curr.cost || 0), 0);
-  const totalTonerCost = logs.filter(l => l.type === 'IN').reduce((acc, curr) => acc + (curr.cost || 0), 0);
-  const grandTotal = totalServiceCost + totalTonerCost;
-
-  // Prepare Chart Data
-  const stockData = stocks.map(s => ({ name: s.modelName, value: s.quantity }));
+  const totalActive = printers.filter(p => p.status === 'ACTIVE').length;
+  const lowStockCount = stocks.filter(s => s.quantity < 3).length;
+  const pendingServices = services.filter(s => s.status === 'PENDING').length;
+  const totalTonerOut = logs.filter(l => l.type === 'OUT').length;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 animate-in fade-in duration-700">
+      {/* Üst Bilgi */}
       <div className="flex justify-between items-center">
           <div>
-            <h2 className="text-2xl font-bold text-zinc-800 dark:text-white">Genel Bakış</h2>
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">Sistem durum özeti ve finansal analiz</p>
+            <h2 className="text-3xl font-black text-zinc-900 dark:text-white uppercase tracking-tighter">SİSTEM ÖZETİ</h2>
+            <p className="text-sm font-bold text-zinc-400 uppercase tracking-widest mt-1">Anlık Cihaz ve Stok Durumu</p>
           </div>
-          <button onClick={fetchData} className="p-2.5 bg-white dark:bg-zinc-800 rounded-xl shadow-sm border border-zinc-200 dark:border-zinc-700 text-zinc-500 hover:text-emerald-500 transition-colors"><RefreshCw size={20}/></button>
+          <button onClick={fetchData} className="p-4 bg-white dark:bg-zinc-900 rounded-2xl shadow-xl border border-zinc-100 dark:border-zinc-800 text-zinc-500 hover:text-emerald-500 transition-all active:scale-90">
+            <RefreshCw size={24}/>
+          </button>
       </div>
       
-      {/* Primary Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* V3 Klasik Sade Kartlar - Tıklanabilir hale getirildi */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         
-        {/* Card 1 */}
-        <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl shadow-sm border border-zinc-200 dark:border-zinc-800 flex items-center justify-between group hover:border-emerald-500/50 transition-all">
-          <div>
-            <p className="text-zinc-500 dark:text-zinc-400 text-xs uppercase font-bold tracking-wider mb-1">Toplam Yazıcı</p>
-            <p className="text-3xl font-bold text-zinc-800 dark:text-white">{totalPrinters}</p>
-          </div>
-          <div className="w-12 h-12 bg-gradient-to-br from-zinc-100 to-zinc-200 dark:from-zinc-800 dark:to-zinc-700 rounded-xl flex items-center justify-center text-zinc-600 dark:text-zinc-300 group-hover:from-emerald-500 group-hover:to-teal-500 group-hover:text-white transition-all shadow-sm">
-            <PrinterIcon size={24} />
-          </div>
-        </div>
-
-        {/* Card 2 */}
-        <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl shadow-sm border border-zinc-200 dark:border-zinc-800 flex items-center justify-between group hover:border-emerald-500/50 transition-all">
-          <div>
-            <p className="text-zinc-500 dark:text-zinc-400 text-xs uppercase font-bold tracking-wider mb-1">Stok Adedi</p>
-            <p className="text-3xl font-bold text-zinc-800 dark:text-white">{totalStockItems}</p>
-          </div>
-          <div className="w-12 h-12 bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/30 dark:to-emerald-800/30 rounded-xl flex items-center justify-center text-emerald-600 dark:text-emerald-400 shadow-sm">
-            <CheckCircle2 size={24} />
+        {/* Aktif Cihazlar -> Yazıcılar */}
+        <div 
+            onClick={() => setActiveTab?.('printers')}
+            className="bg-white dark:bg-zinc-950 p-8 rounded-[2.5rem] shadow-xl border border-zinc-100 dark:border-zinc-900 relative overflow-hidden group cursor-pointer hover:scale-[1.02] active:scale-95 transition-all duration-300"
+        >
+          <div className="absolute -right-4 -top-4 w-24 h-24 bg-emerald-500/5 rounded-full group-hover:scale-150 transition-transform duration-700"></div>
+          <div className="relative z-10">
+            <div className="p-4 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 rounded-2xl w-fit mb-6">
+              <PrinterIcon size={32} />
+            </div>
+            <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-1">Aktif Cihazlar</p>
+            <h3 className="text-5xl font-black text-zinc-900 dark:text-white tracking-tighter">{totalActive}<span className="text-emerald-500 text-2xl ml-1">/ {printers.length}</span></h3>
           </div>
         </div>
 
-        {/* Card 3 */}
-        <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl shadow-sm border border-zinc-200 dark:border-zinc-800 flex items-center justify-between group hover:border-orange-500/50 transition-all">
-           <div>
-            <p className="text-zinc-500 dark:text-zinc-400 text-xs uppercase font-bold tracking-wider mb-1">Bakım Maliyeti</p>
-            <p className="text-3xl font-bold text-orange-600 dark:text-orange-400">{totalServiceCost.toLocaleString()} ₺</p>
-          </div>
-          <div className="w-12 h-12 bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/30 dark:to-orange-800/30 rounded-xl flex items-center justify-center text-orange-600 dark:text-orange-400 shadow-sm">
-            <Wrench size={24} />
+        {/* Bekleyen Servis -> Servis */}
+        <div 
+            onClick={() => setActiveTab?.('service')}
+            className="bg-white dark:bg-zinc-950 p-8 rounded-[2.5rem] shadow-xl border border-zinc-100 dark:border-zinc-900 relative overflow-hidden group cursor-pointer hover:scale-[1.02] active:scale-95 transition-all duration-300"
+        >
+          <div className="absolute -right-4 -top-4 w-24 h-24 bg-orange-500/5 rounded-full group-hover:scale-150 transition-transform duration-700"></div>
+          <div className="relative z-10">
+            <div className="p-4 bg-orange-50 dark:bg-orange-950/40 text-orange-600 rounded-2xl w-fit mb-6">
+              <Clock size={32} />
+            </div>
+            <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-1">Bekleyen Servis</p>
+            <h3 className="text-5xl font-black text-zinc-900 dark:text-white tracking-tighter">{pendingServices}<span className="text-orange-500 text-2xl ml-1">Kayıt</span></h3>
           </div>
         </div>
 
-        {/* Card 4 */}
-        <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl shadow-sm border border-zinc-200 dark:border-zinc-800 flex items-center justify-between group hover:border-emerald-500/50 transition-all">
-           <div>
-            <p className="text-zinc-500 dark:text-zinc-400 text-xs uppercase font-bold tracking-wider mb-1">Toner Maliyeti</p>
-            <p className="text-3xl font-bold text-zinc-800 dark:text-white">{totalTonerCost.toLocaleString()} ₺</p>
-          </div>
-          <div className="w-12 h-12 bg-gradient-to-br from-teal-50 to-teal-100 dark:from-teal-900/30 dark:to-teal-800/30 rounded-xl flex items-center justify-center text-teal-600 dark:text-teal-400 shadow-sm">
-            <Wallet size={24} />
+        {/* Kritik Stok -> Stok */}
+        <div 
+            onClick={() => setActiveTab?.('stock')}
+            className="bg-white dark:bg-zinc-950 p-8 rounded-[2.5rem] shadow-xl border border-zinc-100 dark:border-zinc-900 relative overflow-hidden group cursor-pointer hover:scale-[1.02] active:scale-95 transition-all duration-300"
+        >
+          <div className="absolute -right-4 -top-4 w-24 h-24 bg-red-500/5 rounded-full group-hover:scale-150 transition-transform duration-700"></div>
+          <div className="relative z-10">
+            <div className="p-4 bg-red-50 dark:bg-red-950/40 text-red-600 rounded-2xl w-fit mb-6">
+              <Package size={32} />
+            </div>
+            <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-1">Kritik Stok</p>
+            <h3 className="text-5xl font-black text-zinc-900 dark:text-white tracking-tighter">{lowStockCount}<span className="text-red-500 text-2xl ml-1">Model</span></h3>
           </div>
         </div>
+
+        {/* Toner Değişimleri -> Geçmiş Kayıtlar */}
+        <div 
+            onClick={() => setActiveTab?.('history')}
+            className="bg-white dark:bg-zinc-950 p-8 rounded-[2.5rem] shadow-xl border border-zinc-100 dark:border-zinc-900 relative overflow-hidden group cursor-pointer hover:scale-[1.02] active:scale-95 transition-all duration-300"
+        >
+          <div className="absolute -right-4 -top-4 w-24 h-24 bg-blue-500/5 rounded-full group-hover:scale-150 transition-transform duration-700"></div>
+          <div className="relative z-10">
+            <div className="p-4 bg-blue-50 dark:bg-blue-950/40 text-blue-600 rounded-2xl w-fit mb-6">
+              <Activity size={32} />
+            </div>
+            <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-1">Toner Değişimleri</p>
+            <h3 className="text-5xl font-black text-zinc-900 dark:text-white tracking-tighter">{totalTonerOut}<span className="text-blue-500 text-2xl ml-1">Adet</span></h3>
+          </div>
+        </div>
+
       </div>
 
-      {lowStockItems.length > 0 && (
-         <div className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-900/50 p-4 rounded-xl flex items-start gap-4">
-            <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-full text-red-600">
-                <AlertCircle size={20} />
-            </div>
-            <div>
-               <h4 className="font-bold text-red-700 dark:text-red-400">Kritik Stok Uyarısı</h4>
-               <p className="text-sm text-red-600 dark:text-red-300 mt-1">
-                  Şu modellerde stok 3'ün altına düştü: <span className="font-bold">{lowStockItems.map(s => s.modelName).join(', ')}</span>
-               </p>
-            </div>
-         </div>
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Chart */}
-        <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl shadow-sm border border-zinc-200 dark:border-zinc-800 h-[400px] flex flex-col">
-          <h3 className="font-bold text-zinc-700 dark:text-zinc-200 mb-6 flex items-center gap-2">
-            <TrendingUp size={20} className="text-emerald-500"/> Stok Dağılımı
-          </h3>
-          <div className="flex-1">
-            <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={stockData}>
-                <XAxis dataKey="name" stroke="#71717a" fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis stroke="#71717a" fontSize={12} tickLine={false} axisLine={false} />
-                <RechartsTooltip 
-                    cursor={{fill: 'transparent'}}
-                    contentStyle={{ 
-                        borderRadius: '12px', 
-                        border: 'none', 
-                        boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
-                        backgroundColor: '#18181b',
-                        color: '#fff'
-                    }}
-                    itemStyle={{ color: '#34d399' }}
-                />
-                <Bar dataKey="value" fill="url(#colorGradient)" radius={[6, 6, 0, 0]}>
-                    {stockData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={index % 2 === 0 ? '#10b981' : '#059669'} />
-                    ))}
-                </Bar>
-                </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Recent Activity */}
-        <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl shadow-sm border border-zinc-200 dark:border-zinc-800 h-[400px] flex flex-col">
-          <h3 className="font-bold text-zinc-700 dark:text-zinc-200 mb-4 sticky top-0 bg-white dark:bg-zinc-900 pb-2 flex items-center gap-2">
-             <Clock size={20} className="text-emerald-500"/> Son Hareketler
-          </h3>
-          <div className="space-y-4 overflow-y-auto pr-2 custom-scrollbar">
-            {logs.length === 0 && <p className="text-zinc-400 text-sm text-center py-10">Hareket kaydı bulunamadı.</p>}
-            {logs.slice(0, 10).map(log => (
-              <div key={log.id} className="flex gap-4 p-3 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 rounded-xl transition-colors group">
-                <div className={`mt-1 min-w-[36px] h-9 rounded-full flex items-center justify-center ${log.type === 'IN' ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400'}`}>
-                    {log.type === 'IN' ? <TrendingUp size={16}/> : <TrendingDown size={16}/>}
-                </div>
-                <div className="flex-1">
-                  <div className="flex justify-between items-start">
-                    <p className="font-bold text-zinc-800 dark:text-zinc-200 text-sm">
-                        {log.type === 'IN' ? 'Stok Girişi' : 'Toner Çıkışı'}
-                        <span className="text-emerald-600 dark:text-emerald-400 ml-2 font-mono">({log.tonerModel})</span>
-                    </p>
-                    <span className="text-[10px] text-zinc-400 font-medium">{new Date(log.date).toLocaleDateString('tr-TR')}</span>
-                  </div>
-                  <p className="text-zinc-500 dark:text-zinc-400 text-xs mt-0.5">{log.description}</p>
-                  <div className="flex items-center gap-2 mt-2 text-[10px] text-zinc-400">
-                    <span className="bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded text-zinc-600 dark:text-zinc-300 font-bold">{log.user}</span>
-                    <span>{new Date(log.date).toLocaleTimeString('tr-TR', {hour: '2-digit', minute:'2-digit'})}</span>
-                  </div>
-                </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="bg-zinc-50 dark:bg-zinc-900/50 p-8 rounded-[3rem] border border-zinc-100 dark:border-zinc-900">
+              <h4 className="font-black text-zinc-900 dark:text-white mb-6 uppercase tracking-widest text-sm flex items-center gap-2"><Activity size={20} className="text-emerald-500" /> Son Stok Hareketleri</h4>
+              <div className="space-y-4">
+                  {logs.slice(0, 5).map(log => {
+                      const logDate = new Date(log.date);
+                      return (
+                        <div key={log.id} className="bg-white dark:bg-zinc-950 p-5 rounded-3xl border border-zinc-100 dark:border-zinc-800 flex justify-between items-center group/item hover:border-amber-400/50 transition-all">
+                            <div className="flex gap-4 items-center">
+                                <div className={`p-3 rounded-xl ${log.type === 'IN' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-orange-500/10 text-orange-500'}`}>
+                                    {log.type === 'IN' ? <Package size={18} /> : <Activity size={18} />}
+                                </div>
+                                <div>
+                                    <p className="font-black text-xs text-zinc-800 dark:text-zinc-100 uppercase tracking-tight">{log.tonerModel}</p>
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <p className="text-[9px] text-zinc-400 font-bold uppercase">{log.description}</p>
+                                        <span className="w-1 h-1 bg-zinc-300 dark:bg-zinc-800 rounded-full"></span>
+                                        <p className="text-[9px] font-black text-amber-500 dark:text-amber-400 uppercase tracking-widest flex items-center gap-1">
+                                            <Calendar size={10} /> {logDate.toLocaleDateString('tr-TR')} - {logDate.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                            <span className={`text-[10px] font-black px-4 py-1.5 rounded-xl shadow-sm ${log.type === 'IN' ? 'bg-emerald-500 text-white' : 'bg-orange-500 text-white'}`}>
+                                {log.type === 'IN' ? '+ GİRİŞ' : '- ÇIKIŞ'}
+                            </span>
+                        </div>
+                      );
+                  })}
+                  {logs.length === 0 && <p className="text-zinc-400 text-xs italic text-center py-4 uppercase font-bold tracking-widest">Henüz kayıt bulunmuyor.</p>}
               </div>
-            ))}
           </div>
-        </div>
+
+          <div className="bg-zinc-900 p-10 rounded-[3rem] text-white shadow-2xl relative overflow-hidden group">
+              <div className="absolute right-0 bottom-0 opacity-5 transform translate-x-1/4 translate-y-1/4 group-hover:scale-110 transition-transform duration-1000">
+                  <ShieldAlert size={240} />
+              </div>
+              <div className="relative z-10">
+                  <h4 className="text-2xl font-black tracking-tighter mb-4 uppercase">Operasyonel Durum</h4>
+                  <p className="text-zinc-400 font-medium mb-8 leading-relaxed italic">"Sisteminiz şu anda sorunsuz çalışıyor. Tüm cihazların sayaçları ve toner seviyeleri kontrol altında."</p>
+                  <div className="flex items-center gap-4">
+                      <div className="bg-emerald-500/20 p-4 rounded-3xl backdrop-blur-md border border-emerald-500/30">
+                          <p className="text-[10px] font-black uppercase tracking-widest text-emerald-400">Son Senkronizasyon</p>
+                          <p className="text-xl font-black">{new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}</p>
+                      </div>
+                      <div className="bg-amber-500/10 p-4 rounded-3xl backdrop-blur-md border border-amber-500/20">
+                          <p className="text-[10px] font-black uppercase tracking-widest text-amber-400">Tarih</p>
+                          <p className="text-xl font-black">{new Date().toLocaleDateString('tr-TR')}</p>
+                      </div>
+                  </div>
+              </div>
+          </div>
       </div>
     </div>
   );

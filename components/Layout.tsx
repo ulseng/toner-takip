@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Menu, X, Printer, Package, LogOut, LayoutDashboard, History, Settings, Moon, Sun, Wrench, QrCode, ScanLine, Box, Calculator, MoreHorizontal, ChevronUp, StickyNote } from 'lucide-react';
+import { Menu, X, Printer, Package, LogOut, LayoutDashboard, History, Settings, Moon, Sun, Wrench, QrCode, ScanLine, Box, Calculator, MoreHorizontal, ChevronUp, StickyNote, Banknote } from 'lucide-react';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -12,7 +12,7 @@ interface LayoutProps {
   toggleTheme: () => void;
 }
 
-const APP_VERSION = "v3.0 PRO";
+const APP_VERSION = "v3.1 PRO";
 const DEVELOPER = "Batuhan Yontuç";
 
 export const Layout: React.FC<LayoutProps> = ({ 
@@ -30,6 +30,7 @@ export const Layout: React.FC<LayoutProps> = ({
 
   const navItems = [
     { id: 'dashboard', label: 'Özet', icon: LayoutDashboard },
+    { id: 'invoices', label: 'Faturalar', icon: Banknote },
     { id: 'scan', label: 'QR Tara', icon: ScanLine },
     { id: 'qr', label: 'QR Yönetimi', icon: QrCode },
     { id: 'notes', label: 'Notlarım', icon: StickyNote },
@@ -44,7 +45,7 @@ export const Layout: React.FC<LayoutProps> = ({
 
   const mobileBottomItems = [
     { id: 'dashboard', label: 'Özet', icon: LayoutDashboard },
-    { id: 'qr', label: 'QR', icon: QrCode },
+    { id: 'invoices', label: 'Fatura', icon: Banknote },
     { id: 'scan', label: '', icon: ScanLine }, 
     { id: 'notes', label: 'Notlar', icon: StickyNote },
     { id: 'menu', label: 'Menü', icon: MoreHorizontal },
