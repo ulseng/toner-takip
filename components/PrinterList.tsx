@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect, useMemo, memo } from 'react';
-import { Plus, Search, MapPin, Printer as PrinterIcon, Edit2, X, Wifi, Usb, Trash2, QrCode, RefreshCw, Calendar, Calculator, Wrench, Droplet, Globe, TrendingUp, User as UserIcon, SortAsc, SortDesc, Filter, Layers, LayoutGrid, Type, Clock, ShieldCheck, Zap, StickyNote, Image as ImageIcon } from 'lucide-react';
+import React, { useState, useEffect, useMemo, memo, useRef } from 'react';
+import { Plus, Search, MapPin, Printer as PrinterIcon, Edit2, X, Wifi, Usb, Trash2, QrCode, RefreshCw, Calendar, Calculator, Wrench, Droplet, Globe, TrendingUp, User as UserIcon, SortAsc, SortDesc, Filter, Layers, LayoutGrid, Type, Clock, ShieldCheck, Zap, StickyNote, Image as ImageIcon, ChevronDown, ChevronUp } from 'lucide-react';
 import { Printer as PrinterType, SystemConfig, StockLog, ServiceRecord, CounterLog, Note } from '../types';
 import { StorageService } from '../services/storage';
 import { LoadingScreen } from './LoadingScreen';
@@ -116,6 +116,10 @@ export const PrinterList: React.FC<PrinterListProps> = ({ targetPrinterId, clear
   const [printerTonerLogs, setPrinterTonerLogs] = useState<StockLog[]>([]);
   const [printerNotes, setPrinterNotes] = useState<Note[]>([]);
 
+  // Detay Drawer Scroll Kontrolü
+  const detailScrollRef = useRef<HTMLDivElement>(null);
+  const [showDetailScrollTop, setShowDetailScrollTop] = useState(false);
+
   const [formData, setFormData] = useState<Partial<PrinterType>>({
     brand: '', model: '', serialNumber: '', shortCode: '', location: '', floor: '',
     lastCounter: 0, connectionType: 'USB', ipAddress: '', status: 'ACTIVE'
@@ -131,6 +135,7 @@ export const PrinterList: React.FC<PrinterListProps> = ({ targetPrinterId, clear
     const handlePopState = () => {
       setSelectedPrinter(null);
       setIsFormModalOpen(false);
+      setShowDetailScrollTop(false);
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -214,6 +219,15 @@ export const PrinterList: React.FC<PrinterListProps> = ({ targetPrinterId, clear
        await StorageService.deletePrinter(printer.id);
        loadData();
     }
+  };
+
+  const handleDetailScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    if (e.currentTarget.scrollTop > 300) setShowDetailScrollTop(true);
+    else setShowDetailScrollTop(false);
+  };
+
+  const scrollToDetailTop = () => {
+    detailScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   // Performans için arama ve filtreleme belleğe alınıyor
@@ -310,32 +324,44 @@ export const PrinterList: React.FC<PrinterListProps> = ({ targetPrinterId, clear
         )}
       </div>
 
-      {/* DETAY DRAWER */}
+      {/* DETAY DRAWER (TAM KAYDIRILABİLİR) */}
       {selectedPrinter && (
-          <div className="fixed inset-0 z-[500] flex justify-end">
+          <div className="fixed inset-0 z-[500] flex flex-col justify-end">
               <div className="absolute inset-0 bg-black/90 backdrop-blur-md animate-in fade-in" onClick={() => window.history.back()}></div>
-              <div className="relative w-full max-w-xl bg-[#09090b] h-full shadow-2xl border-l border-white/5 animate-in slide-in-from-right duration-500 flex flex-col overflow-hidden">
+              
+              <div 
+                ref={detailScrollRef}
+                onScroll={handleDetailScroll}
+                className="relative w-full max-w-xl mx-auto bg-[#09090b] md:h-full h-[95vh] shadow-2xl md:border-l border-t md:border-t-0 border-white/10 animate-in md:slide-in-from-right slide-in-from-bottom duration-500 flex flex-col overflow-y-auto custom-scrollbar md:rounded-none rounded-t-[3.5rem]"
+              >
                   
-                  <div className="p-8 flex flex-col bg-zinc-950/50 border-b border-white/5 relative">
-                      <button onClick={() => window.history.back()} className="absolute top-6 right-6 p-4 bg-zinc-900 text-white rounded-2xl hover:bg-red-600 transition-all z-20"><X size={24} strokeWidth={3}/></button>
-                      <div className="flex flex-col md:flex-row gap-6 items-start mb-6">
-                          <div className="flex flex-col items-center gap-2 p-3 bg-white rounded-2xl shadow-xl border border-zinc-800 shrink-0">
+                  {/* Mobil İçin Tutamaç & Kapat Butonu */}
+                  <div className="sticky top-0 z-[60] flex justify-between items-center p-6 bg-zinc-950/20 backdrop-blur-sm">
+                      <div className="w-12 h-1.5 bg-zinc-800 rounded-full mx-auto md:hidden absolute left-1/2 -translate-x-1/2 top-4"></div>
+                      <div className="flex-1"></div>
+                      <button onClick={() => window.history.back()} className="p-4 bg-zinc-900/80 backdrop-blur-xl text-white rounded-2xl hover:bg-red-600 transition-all shadow-2xl border border-white/5"><X size={24} strokeWidth={3}/></button>
+                  </div>
+
+                  {/* BAŞLIK & QR PANELİ (ARTIK KAYABİLİR) */}
+                  <div className="px-8 pb-8 flex flex-col bg-zinc-950/50 border-b border-white/5 relative">
+                      <div className="flex flex-col md:flex-row gap-6 items-start">
+                          <div className="flex flex-col items-center gap-2 p-3 bg-white rounded-3xl shadow-xl border border-zinc-800 shrink-0 mx-auto md:mx-0">
                               <img src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(window.location.origin + window.location.pathname + '?pid=' + selectedPrinter.id)}`} className="w-24 h-24" alt="QR"/>
                               <div className="bg-zinc-950 text-emerald-500 px-3 py-1 rounded-lg font-black text-xs">#{selectedPrinter.shortCode}</div>
                           </div>
-                          <div className="flex-1 pt-1">
+                          <div className="flex-1 pt-1 text-center md:text-left">
                               <span className="bg-emerald-500/10 text-emerald-500 px-3 py-1 rounded-lg text-[9px] font-black tracking-[0.3em] border border-emerald-500/20 uppercase mb-3 inline-block">CİHAZ PASAPORTU</span>
                               <h3 className="text-3xl md:text-4xl font-black text-white tracking-tighter uppercase leading-none">{selectedPrinter.brand} {selectedPrinter.model}</h3>
-                              <p className="mt-3 text-zinc-500 font-bold uppercase tracking-widest flex items-center gap-2"><MapPin size={14} className="text-emerald-500"/> {selectedPrinter.location} — {selectedPrinter.floor}</p>
+                              <p className="mt-3 text-zinc-500 font-bold uppercase tracking-widest flex items-center justify-center md:justify-start gap-2"><MapPin size={14} className="text-emerald-500"/> {selectedPrinter.location} — {selectedPrinter.floor}</p>
                           </div>
                       </div>
                   </div>
 
-                  <div className="flex-1 overflow-y-auto p-10 space-y-12 custom-scrollbar">
+                  <div className="p-10 space-y-12">
                       <div className="grid grid-cols-3 gap-4">
-                          <div className="bg-zinc-900/40 p-6 rounded-2xl border border-white/5 text-center"><p className="text-[9px] font-black text-zinc-600 uppercase mb-1.5">SAYAÇ</p><p className="text-xl font-black text-white font-mono">{selectedPrinter.lastCounter.toLocaleString()}</p></div>
-                          <div className="bg-zinc-900/40 p-6 rounded-2xl border border-white/5 text-center"><p className="text-[9px] font-black text-zinc-600 uppercase mb-1.5">MALİYET</p><p className="text-xl font-black text-emerald-500 font-mono">{printerServices.reduce((a,c)=>a+(c.cost||0),0).toLocaleString()} ₺</p></div>
-                          <div className="bg-zinc-900/40 p-6 rounded-2xl border border-white/5 text-center"><p className="text-[9px] font-black text-zinc-600 uppercase mb-1.5">TONER</p><p className="text-xl font-black text-orange-500 font-mono">{printerTonerLogs.length}</p></div>
+                          <div className="bg-zinc-900/40 p-6 rounded-[2rem] border border-white/5 text-center shadow-lg"><p className="text-[9px] font-black text-zinc-600 uppercase mb-1.5 tracking-widest">SAYAÇ</p><p className="text-xl font-black text-white font-mono">{selectedPrinter.lastCounter.toLocaleString()}</p></div>
+                          <div className="bg-zinc-900/40 p-6 rounded-[2rem] border border-white/5 text-center shadow-lg"><p className="text-[9px] font-black text-zinc-600 uppercase mb-1.5 tracking-widest">MALİYET</p><p className="text-xl font-black text-emerald-500 font-mono">{printerServices.reduce((a,c)=>a+(c.cost||0),0).toLocaleString()} ₺</p></div>
+                          <div className="bg-zinc-900/40 p-6 rounded-[2rem] border border-white/5 text-center shadow-lg"><p className="text-[9px] font-black text-zinc-600 uppercase mb-1.5 tracking-widest">TONER</p><p className="text-xl font-black text-orange-500 font-mono">{printerTonerLogs.length}</p></div>
                       </div>
 
                       {/* TONER DEĞİŞİM GEÇMİŞİ */}
@@ -343,21 +369,21 @@ export const PrinterList: React.FC<PrinterListProps> = ({ targetPrinterId, clear
                           <h4 className="flex items-center gap-3 text-white font-black text-lg uppercase tracking-tighter"><Droplet size={24} className="text-orange-500"/> TONER DEĞİŞİM GEÇMİŞİ</h4>
                           <div className="space-y-3">
                               {printerTonerLogs.map(log => (
-                                  <div key={log.id} className="bg-zinc-900/40 p-6 rounded-2xl border border-white/5 relative group/row overflow-hidden">
-                                      <div className="absolute left-0 top-0 bottom-0 w-1 bg-orange-500"></div>
+                                  <div key={log.id} className="bg-zinc-900/40 p-6 rounded-[2rem] border border-white/5 relative group/row overflow-hidden shadow-xl">
+                                      <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-orange-500"></div>
                                       <div className="flex justify-between items-start mb-1">
                                           <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">{new Date(log.date).toLocaleDateString()}</span>
-                                          <span className="text-xs font-black text-white bg-zinc-800 px-2 py-0.5 rounded-lg">{log.tonerModel}</span>
+                                          <span className="text-xs font-black text-white bg-zinc-800 px-3 py-1 rounded-full">{log.tonerModel}</span>
                                       </div>
                                       <h5 className="text-sm font-black text-zinc-300 uppercase leading-tight mb-1">{log.description}</h5>
-                                      <div className="flex justify-between items-center text-[8px] font-black text-zinc-600">
+                                      <div className="flex justify-between items-center text-[8px] font-black text-zinc-600 mt-2">
                                           <span>SAAT: {new Date(log.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
                                           <span>TEKNİSYEN: {log.user}</span>
                                       </div>
                                   </div>
                               ))}
                               {printerTonerLogs.length === 0 && (
-                                  <div className="py-8 bg-zinc-900/20 border border-dashed border-zinc-800 rounded-3xl text-center">
+                                  <div className="py-8 bg-zinc-900/20 border border-dashed border-zinc-800 rounded-[2rem] text-center">
                                       <p className="text-zinc-700 font-black uppercase text-[10px]">Henüz toner değişimi kaydedilmedi.</p>
                                   </div>
                               )}
@@ -368,7 +394,7 @@ export const PrinterList: React.FC<PrinterListProps> = ({ targetPrinterId, clear
                           <h4 className="flex items-center gap-3 text-white font-black text-lg uppercase tracking-tighter"><StickyNote size={24} className="text-blue-500"/> CİHAZ NOTLARI</h4>
                           <div className="space-y-3">
                               {printerNotes.map(note => (
-                                  <div key={note.id} className="bg-zinc-900/20 p-5 rounded-2xl border border-white/5">
+                                  <div key={note.id} className="bg-zinc-900/20 p-6 rounded-[2rem] border border-white/5 shadow-xl">
                                       <h5 className="font-black text-white uppercase text-xs mb-1.5">{note.title}</h5>
                                       <p className="text-zinc-500 text-xs leading-relaxed">{note.content}</p>
                                       <div className="mt-3 flex justify-between items-center text-[8px] font-black text-zinc-700">
@@ -384,8 +410,8 @@ export const PrinterList: React.FC<PrinterListProps> = ({ targetPrinterId, clear
                       <div className="space-y-6">
                           <h4 className="flex items-center gap-3 text-white font-black text-lg uppercase tracking-tighter"><Wrench size={24} className="text-emerald-500"/> SERVİS GEÇMİŞİ</h4>
                           {printerServices.map(s => (
-                              <div key={s.id} className="bg-zinc-900/40 p-6 rounded-2xl border border-white/5 relative group/row overflow-hidden">
-                                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500"></div>
+                              <div key={s.id} className="bg-zinc-900/40 p-6 rounded-[2rem] border border-white/5 relative group/row overflow-hidden shadow-xl">
+                                  <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-emerald-500"></div>
                                   <div className="flex justify-between items-start mb-3">
                                       <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">{new Date(s.date).toLocaleDateString()}</span>
                                       <span className="text-lg font-black text-white">{s.cost.toLocaleString()} ₺</span>
@@ -395,13 +421,24 @@ export const PrinterList: React.FC<PrinterListProps> = ({ targetPrinterId, clear
                               </div>
                           ))}
                       </div>
-                  </div>
-                  
-                  <div className="p-10 bg-zinc-950 border-t border-white/5 grid grid-cols-2 gap-4">
-                      <button onClick={(e) => openFormModal(e, selectedPrinter)} className="py-6 bg-zinc-900 text-white rounded-2xl font-black uppercase text-[10px] tracking-[0.3em]">DÜZENLE</button>
-                      <button onClick={() => window.history.back()} className="py-6 bg-white text-black rounded-2xl font-black uppercase text-[10px] tracking-[0.3em]">KAPAT</button>
+
+                      {/* ALT AKSİYONLAR (KAYDIRILABİLİR ALANIN SONUNDA) */}
+                      <div className="pt-10 grid grid-cols-2 gap-4 pb-20">
+                          <button onClick={(e) => openFormModal(e, selectedPrinter)} className="py-6 bg-zinc-900 text-white rounded-[1.5rem] font-black uppercase text-[10px] tracking-[0.3em] active:scale-95 transition-all shadow-xl">DÜZENLE</button>
+                          <button onClick={() => window.history.back()} className="py-6 bg-white text-black rounded-[1.5rem] font-black uppercase text-[10px] tracking-[0.3em] active:scale-95 transition-all shadow-xl">KAPAT</button>
+                      </div>
                   </div>
               </div>
+
+              {/* YUKARI ÇIK BUTONU (Sadece Drawer Açıkken ve Aşağı Kaydırılmışken) */}
+              {showDetailScrollTop && (
+                  <button 
+                    onClick={scrollToDetailTop} 
+                    className="fixed bottom-10 right-6 z-[600] p-5 rounded-full bg-emerald-600 text-white shadow-[0_10px_30px_rgba(16,185,129,0.5)] border border-emerald-400/20 transition-all active:scale-90 animate-in fade-in slide-in-from-bottom-4"
+                  >
+                      <ChevronUp size={32} strokeWidth={3} />
+                  </button>
+              )}
           </div>
       )}
 
