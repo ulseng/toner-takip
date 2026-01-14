@@ -29,14 +29,37 @@ export interface Printer {
   isColor?: boolean;
   lastCounterBW?: number;
   lastCounterColor?: number;
+  monthlyRentalCost?: number;
+}
+
+export interface MonthlyInvoice {
+  id: string;
+  month: string;
+  year: number;
+  euroRate: number;
+  totalTL: number;
+  imageUrl?: string;
+  status: 'PAID' | 'PENDING';
+  createdAt: string;
+  paidAt?: string;
 }
 
 export interface Note {
   id: string;
+  printerId?: string; // Yazıcıya bağlı notlar için
   title: string;
   content: string;
   date: string;
   user: string;
+  imageUrl?: string;
+}
+
+export interface ActivityLog {
+  id: string;
+  date: string;
+  user: string;
+  action: string;
+  details: string;
 }
 
 export interface TonerStock {
@@ -53,8 +76,8 @@ export interface StockLog {
   description: string;
   printerId?: string;
   user: string;
-  cost?: number;
   pageYield?: number;
+  cost?: number;
 }
 
 export interface ServiceRecord {
@@ -64,9 +87,12 @@ export interface ServiceRecord {
   date: string;
   issue: string;
   actionTaken: string;
-  cost: number;
+  note?: string;
+  imageUrl?: string;
+  cost?: number;
   provider: string;
   status: 'PENDING' | 'COMPLETED' | 'SCRAPPED';
+  lastModifiedBy?: string;
 }
 
 export interface CounterLog {
@@ -94,4 +120,22 @@ export interface SystemConfig {
   whatsappNumber?: string;
   brandImages?: Record<string, string>; 
   modelImages?: Record<string, string>;
+}
+
+export interface InvoiceRecord {
+  id: string;
+  month: string;
+  year: number;
+  euroRate: number;
+  fixedFeeEuro: number;
+  totalAmountTL: number;
+  status: 'PAID' | 'UNPAID';
+  imageUrl?: string;
+  details: {
+    a4QuotaUsed: number;
+    a4OverQuota: number;
+    a3ColorCount: number;
+    a4ColorCount: number;
+    scanCount: number;
+  };
 }

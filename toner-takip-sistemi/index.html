@@ -5,18 +5,12 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="theme-color" content="#064e3b" />
-    
-    <!-- Security: Force HTTPS immediately to prevent SSL Protocol Errors on Mobile -->
     <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
-
-    <!-- PWA / Mobile App Settings -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Toner Takip">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="application-name" content="Toner Takip">
-    
-    <!-- App Icon -->
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3022/3022251.png">
     <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/3022/3022251.png">
 
@@ -32,22 +26,14 @@
           extend: {
             colors: {
               primary: {
-                50: '#ecfdf5', 
-                100: '#d1fae5', 
-                200: '#a7f3d0', 
-                300: '#6ee7b7', 
-                400: '#34d399', 
-                500: '#10b981', 
-                600: '#059669', 
-                700: '#047857', 
-                800: '#065f46', 
-                900: '#064e3b', 
-                950: '#022c22', 
+                500: '#10b981',
+                600: '#059669',
+                700: '#047857',
               },
-              dark: {
-                 800: '#27272a', 
-                 900: '#18181b', 
-                 950: '#09090b', 
+              anthracite: {
+                800: '#1e1e20',
+                900: '#121214',
+                950: '#09090b',
               }
             },
             animation: {
@@ -58,11 +44,10 @@
       }
     </script>
     <style>
-      ::-webkit-scrollbar { width: 6px; height: 6px; }
+      ::-webkit-scrollbar { width: 5px; height: 5px; }
       ::-webkit-scrollbar-track { background: transparent; }
-      ::-webkit-scrollbar-thumb { background: #a7f3d0; border-radius: 3px; }
+      ::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 10px; }
       ::-webkit-scrollbar-thumb:hover { background: #10b981; }
-      .dark ::-webkit-scrollbar-thumb { background: #27272a; }
       
       html, body {
         margin: 0;
@@ -72,7 +57,7 @@
         overflow: hidden; 
         overscroll-behavior-y: none;
         -webkit-tap-highlight-color: transparent;
-        touch-action: pan-x pan-y;
+        background: #09090b;
       }
 
       #root {
@@ -80,11 +65,8 @@
         width: 100%;
       }
 
-      @supports (padding-top: env(safe-area-inset-top)) {
-        body {
-          padding-top: env(safe-area-inset-top);
-          padding-bottom: env(safe-area-inset-bottom);
-        }
+      .anthracite-gradient {
+        background: linear-gradient(135deg, #09090b 0%, #121214 50%, #18181b 100%);
       }
     </style>
   <script type="importmap">
@@ -105,7 +87,7 @@
 </script>
 <link rel="stylesheet" href="/index.css">
 </head>
-  <body class="bg-zinc-50 dark:bg-black selection:bg-emerald-200 selection:text-emerald-900">
+  <body class="dark selection:bg-emerald-500/30 selection:text-emerald-200">
     <div id="root"></div>
   <script type="module" src="/index.tsx"></script>
 </body>

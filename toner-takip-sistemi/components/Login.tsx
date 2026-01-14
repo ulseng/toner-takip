@@ -24,7 +24,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin, isDarkMode, toggleTheme }
     try {
       const user = await StorageService.login(username, password);
       if (user) onLogin(user);
-      else setError('Hatalı kimlik bilgileri! (admin/yasam)');
+      else setError('Hatalı kullanıcı adı veya şifre!');
     } catch (err) {
       setError('Veritabanı bağlantı hatası.');
     } finally {
