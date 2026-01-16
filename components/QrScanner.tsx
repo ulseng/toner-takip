@@ -49,7 +49,7 @@ export const QrScanner: React.FC = () => {
             setIsCameraReady(true);
         }).catch(err => {
             console.error("Camera error:", err);
-            setError("Kamera başlatılamadı. APK izinlerini veya tarayıcı ayarlarını kontrol edin.");
+            setError("Kamera başlatılamadı. APK izinlerini kontrol edin.");
         });
     }, 700);
   };
@@ -63,26 +63,31 @@ export const QrScanner: React.FC = () => {
     };
   }, []);
 
-  const handleScanSuccess = (text: string) => {
-      // Eğer text bir URL ise parse et
+  const handleScanSuccess = async (text: string) => {
+      // 1. Durum: Tam URL okunduysa
       if (text.startsWith('http')) {
           try {
-              const urlObj = new URL(text);
-              const sc = urlObj.searchParams.get("sc");
-              const pid = urlObj.searchParams.get("pid");
+              const url = new URL(text);
+              const sc = url.searchParams.get("sc");
+              const pid = url.searchParams.get("pid");
+              
               if (pid) {
-                  window.location.href = window.location.origin + window.location.pathname + "?pid=" + pid;
+                  window.location.href = `${window.location.origin}${window.location.pathname}?pid=${pid}`;
               } else if (sc) {
-                  handleManualSubmit(sc);
+                  await handleManualSubmit(sc);
               } else {
-                  setError("Okunan URL sistemle uyumlu değil.");
+                  setError("Okunan QR kodu sistemle uyumlu değil.");
               }
-          } catch (e) { setError("Geçersiz URL formatı."); }
-      } else if (/^\d{4}$/.test(text)) {
-          // Eğer text sadece 4 haneli rakam ise (ShortCode)
-          handleManualSubmit(text);
-      } else {
-          setError("QR içeriği anlaşılamadı. (İçerik: " + text + ")");
+          } catch (e) {
+              setError("Geçersiz URL formatı okundu.");
+          }
+      } 
+      // 2. Durum: Sadece Hızlı Kod (4 haneli rakam) okunduysa
+      else if (/^\d{4,5}$/.test(text)) {
+          await handleManualSubmit(text);
+      } 
+      else {
+          setError("QR içeriği anlaşılamadı. Lütfen sistem tarafından oluşturulan QR kodlarını kullanın.");
       }
   };
 
@@ -94,9 +99,10 @@ export const QrScanner: React.FC = () => {
       try {
           const printer = await StorageService.findPrinterByShortCode(code);
           if (printer) {
-              window.location.href = window.location.origin + window.location.pathname + "?pid=" + printer.id;
+              // Uygulamayı o yazıcının detayına yönlendir
+              window.location.href = `${window.location.origin}${window.location.pathname}?pid=${printer.id}`;
           } else {
-              setError("Hızlı Kod (" + code + ") ile eşleşen cihaz bulunamadı.");
+              setError(`Hızlı Kod (#${code}) ile eşleşen cihaz bulunamadı.`);
               setIsSearching(false);
           }
       } catch (e) {
@@ -123,7 +129,7 @@ export const QrScanner: React.FC = () => {
           {!isCameraReady && !error && (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-zinc-950 text-emerald-500">
                   <Loader2 size={40} className="animate-spin mb-4 opacity-50" />
-                  <p className="font-black text-[10px] uppercase tracking-widest">Kamera Bağlanıyor...</p>
+                  <p className="font-black text-[10px] uppercase tracking-widest">Kamera Aktifleşiyor...</p>
               </div>
           )}
           {error && (
@@ -137,11 +143,20 @@ export const QrScanner: React.FC = () => {
 
       <div className="mt-8 space-y-6">
           <div className="flex flex-col items-center gap-4">
-              <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">MANUEL HIZLI KOD GİRİŞİ</span>
+              <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">MANUEL KOD GİRİŞİ</span>
               <div className="flex w-full gap-2">
                   <div className="relative flex-1">
                       <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
-                      <input type="number" pattern="[0-9]*" inputMode="numeric" placeholder="Örn: 1022" className="w-full pl-12 pr-6 py-4 rounded-2xl bg-zinc-100 dark:bg-zinc-900 text-zinc-900 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 font-black text-xl" value={manualCode} onChange={(e) => setManualCode(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleManualSubmit()} />
+                      <input 
+                        type="number" 
+                        pattern="[0-9]*" 
+                        inputMode="numeric" 
+                        placeholder="Örn: 1022" 
+                        className="w-full pl-12 pr-6 py-4 rounded-2xl bg-zinc-100 dark:bg-zinc-900 text-zinc-900 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 font-black text-xl" 
+                        value={manualCode} 
+                        onChange={(e) => setManualCode(e.target.value)} 
+                        onKeyDown={(e) => e.key === 'Enter' && handleManualSubmit()} 
+                      />
                   </div>
                   <button onClick={() => handleManualSubmit()} disabled={!manualCode || isSearching} className="bg-emerald-600 text-white px-6 rounded-2xl flex items-center justify-center">
                       {isSearching ? <Loader2 className="animate-spin" size={24}/> : <ArrowRight size={24} />}

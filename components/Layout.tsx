@@ -1,18 +1,18 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Menu, X, Printer, Package, LogOut, LayoutDashboard, History, Settings, Moon, Sun, Wrench, QrCode, ScanLine, Box, Calculator, MoreHorizontal, ChevronUp, StickyNote, Banknote } from 'lucide-react';
+import { Menu, X, Printer, Package, LogOut, LayoutDashboard, History, Settings, Moon, Sun, Wrench, QrCode, ScanLine, Box, Calculator, MoreHorizontal, ChevronUp, StickyNote, Banknote, User as UserIcon } from 'lucide-react';
 
 interface LayoutProps {
   children: React.ReactNode;
   activeTab: string;
   setActiveTab: (tab: string) => void;
   onLogout: () => void;
-  user: { name: string };
+  user: { name: string; username: string };
   isDarkMode: boolean;
   toggleTheme: () => void;
 }
 
-const APP_VERSION = "v3.1 PRO";
+const APP_VERSION = "v3.2 PRO";
 const DEVELOPER = "Batuhan Yontuç";
 
 export const Layout: React.FC<LayoutProps> = ({ 
@@ -54,6 +54,7 @@ export const Layout: React.FC<LayoutProps> = ({
   return (
     <div className={`h-full flex flex-col md:flex-row bg-zinc-50 dark:bg-black transition-colors duration-500 overflow-hidden fixed inset-0 font-sans ${isDarkMode ? 'dark' : ''}`}>
       
+      {/* DESKTOP SIDEBAR */}
       <aside className="hidden md:flex flex-col w-72 bg-white dark:bg-zinc-950 h-full shadow-[20px_0_40px_-20px_rgba(0,0,0,0.1)] dark:shadow-none border-r border-zinc-100 dark:border-zinc-900 z-50">
         <div className="p-8">
           <button onClick={() => setActiveTab('dashboard')} className="flex items-center gap-4 group">
@@ -98,15 +99,57 @@ export const Layout: React.FC<LayoutProps> = ({
         </div>
       </aside>
 
+      {/* MOBILE SIDE MENU (DRAWER) */}
       <div className={`fixed inset-0 z-[100] transition-opacity duration-500 md:hidden ${isMobileMenuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
           <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setIsMobileMenuOpen(false)}></div>
           <div className={`absolute left-0 top-0 bottom-0 w-80 bg-white dark:bg-zinc-950 shadow-2xl flex flex-col transform transition-transform duration-500 ease-out ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-              <div className="p-8 border-b border-zinc-100 dark:border-zinc-900 flex justify-between items-center"><h2 className="text-zinc-900 dark:text-white font-black text-xl tracking-tighter">MENÜ</h2><button onClick={() => setIsMobileMenuOpen(false)} className="p-2 bg-zinc-100 dark:bg-zinc-900 rounded-xl text-zinc-500"><X size={24}/></button></div>
-              <nav className="flex-1 overflow-y-auto p-4 space-y-2">
+              <div className="p-8 border-b border-zinc-100 dark:border-zinc-900 flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                    <div className="p-2 bg-emerald-500 rounded-xl text-white"><Printer size={20}/></div>
+                    <h2 className="text-zinc-900 dark:text-white font-black text-xl tracking-tighter uppercase leading-none">Menü</h2>
+                </div>
+                <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 bg-zinc-100 dark:bg-zinc-900 rounded-xl text-zinc-500"><X size={24}/></button>
+              </div>
+              
+              <nav className="flex-1 overflow-y-auto p-4 space-y-1.5 custom-scrollbar">
                   {navItems.map(item => (
-                      <button key={item.id} onClick={() => { setActiveTab(item.id); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl transition-all font-black text-sm uppercase tracking-wider ${activeTab === item.id ? 'bg-emerald-600 text-white shadow-lg' : 'text-zinc-500 dark:text-zinc-400'}`}><item.icon size={20} /> {item.label}</button>
+                      <button 
+                        key={item.id} 
+                        onClick={() => { setActiveTab(item.id); setIsMobileMenuOpen(false); }} 
+                        className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl transition-all font-black text-xs uppercase tracking-wider ${activeTab === item.id ? 'bg-emerald-600 text-white shadow-lg' : 'text-zinc-500 dark:text-zinc-400 active:bg-zinc-100 dark:active:bg-zinc-900'}`}
+                      >
+                        <item.icon size={20} /> {item.label}
+                      </button>
                   ))}
               </nav>
+
+              {/* MOBİL ÇIKIŞ BÖLÜMÜ */}
+              <div className="p-6 border-t border-zinc-100 dark:border-zinc-900 bg-zinc-50/50 dark:bg-zinc-950">
+                  <div className="flex items-center gap-4 mb-4 p-4 bg-white dark:bg-zinc-900 rounded-[1.5rem] border border-zinc-100 dark:border-zinc-800 shadow-sm">
+                      <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center text-white font-black text-lg shadow-lg">
+                        {user.name.charAt(0)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                          <p className="font-black text-sm text-zinc-900 dark:text-white truncate uppercase tracking-tight">{user.name}</p>
+                          <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest truncate">@{user.username}</p>
+                      </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                      <button 
+                        onClick={() => { toggleTheme(); setIsMobileMenuOpen(false); }} 
+                        className="flex items-center justify-center gap-2 py-4 bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-2xl text-zinc-500 dark:text-zinc-400 font-black text-[10px] uppercase tracking-widest shadow-sm"
+                      >
+                        {isDarkMode ? <Sun size={16} /> : <Moon size={16} />} Tema
+                      </button>
+                      <button 
+                        onClick={() => { onLogout(); setIsMobileMenuOpen(false); }} 
+                        className="flex items-center justify-center gap-2 py-4 bg-red-50 dark:bg-red-950/20 text-red-600 border border-red-100 dark:border-red-900/30 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-sm active:scale-95 transition-all"
+                      >
+                        <LogOut size={16} /> Çıkış Yap
+                      </button>
+                  </div>
+                  <p className="text-[7px] text-zinc-400 font-black uppercase text-center mt-6 tracking-[0.3em]">Developer: {DEVELOPER} | {APP_VERSION}</p>
+              </div>
           </div>
       </div>
 
