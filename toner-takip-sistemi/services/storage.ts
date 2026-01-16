@@ -23,6 +23,7 @@ const INITIAL_CONFIG: SystemConfig = {
   suppliers: ['Anahtar Bilgisayar', 'Enes Bilişim', 'Kendi Malımız'],
   tonerModels: ['1643', '505', '259x'],
   whatsappNumber: '',
+  appUrl: '',
   brandImages: {},
   modelImages: {}
 };

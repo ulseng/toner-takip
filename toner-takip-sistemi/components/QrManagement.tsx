@@ -1,225 +1,184 @@
 
 import React, { useState, useEffect } from 'react';
 import { StorageService } from '../services/storage';
-import { Printer } from '../types';
+import { Printer, SystemConfig } from '../types';
 import { LoadingScreen } from './LoadingScreen';
-import { Printer as PrinterIcon, QrCode, Download, Save, Hash, FileText, Layers, RefreshCw, Wifi, Globe, Loader2, CheckCircle2 } from 'lucide-react';
+import { Printer as PrinterIcon, QrCode, Download, Image as ImageIcon, CheckCircle2, Loader2, X, Layers } from 'lucide-react';
+
+declare const html2canvas: any;
+declare const jspdf: any;
 
 export const QrManagement: React.FC = () => {
   const [printers, setPrinters] = useState<Printer[]>([]);
+  const [config, setConfig] = useState<SystemConfig | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isPrintMode, setIsPrintMode] = useState(false);
-  const [generatingPdf, setGeneratingPdf] = useState(false);
+  const [selectedPrinters, setSelectedPrinters] = useState<string[]>([]);
+  const [generating, setGenerating] = useState<null | 'pdf' | 'jpeg'>(null);
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => {
+    loadData();
+  }, []);
 
   const loadData = async () => {
     setLoading(true);
-    const p = await StorageService.getPrinters();
-    setPrinters(p.sort((a, b) => parseInt(a.shortCode || '0') - parseInt(b.shortCode || '0')));
+    const [pData, cData] = await Promise.all([
+        StorageService.getPrinters(),
+        StorageService.getConfig()
+    ]);
+    setPrinters(pData.sort((a, b) => (a.shortCode || '').localeCompare(b.shortCode || '')));
+    setConfig(cData);
     setLoading(false);
   };
 
-  const chunkArray = (arr: any[], size: number) => {
-    const results = [];
-    const copy = [...arr];
-    while (copy.length) results.push(copy.splice(0, size));
-    return results;
+  const toggleSelect = (id: string) => {
+    setSelectedPrinters(prev => 
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
   };
 
-  const handleDownloadPdf = async () => {
-    if (generatingPdf) return;
-    
-    setGeneratingPdf(true);
+  const selectAll = () => {
+    if (selectedPrinters.length === printers.length) setSelectedPrinters([]);
+    else setSelectedPrinters(printers.map(p => p.id));
+  };
+
+  const chunkArray = (array: any[], size: number) => {
+    const chunked = [];
+    for (let i = 0; i < array.length; i += size) {
+      chunked.push(array.slice(i, i + size));
+    }
+    return chunked;
+  };
+
+  const handleDownload = async (type: 'pdf' | 'jpeg') => {
+    if (selectedPrinters.length === 0) return;
+    setGenerating(type);
+
+    const selectedData = printers.filter(p => selectedPrinters.includes(p.id));
+    const pages = chunkArray(selectedData, 12); 
+
     try {
-        const { jsPDF } = (window as any).jspdf;
-        const html2canvas = (window as any).html2canvas;
+      const pdf = type === 'pdf' ? new jspdf.jsPDF('p', 'mm', 'a4') : null;
+
+      for (let i = 0; i < pages.length; i++) {
+        const pageId = `page-${i}`;
+        const pageElement = document.getElementById(pageId);
         
-        const pdf = new jsPDF('p', 'mm', 'a4');
-        const pageElements = document.querySelectorAll('.a4-page-capture');
-        
-        for (let i = 0; i < pageElements.length; i++) {
-            const element = pageElements[i] as HTMLElement;
-            
-            // Capture each A4 page group
-            const canvas = await html2canvas(element, {
-                scale: 2, // High resolution
-                useCORS: true,
-                logging: false,
-                backgroundColor: '#ffffff'
-            });
-            
-            const imgData = canvas.toDataURL('image/png');
-            const pdfWidth = pdf.internal.pageSize.getWidth();
-            const pdfHeight = pdf.internal.pageSize.getHeight();
-            
+        if (pageElement) {
+          const canvas = await html2canvas(pageElement, {
+            scale: 4, // Daha yüksek kalite için 4x
+            useCORS: true,
+            logging: false,
+            backgroundColor: '#ffffff'
+          });
+
+          const imgData = canvas.toDataURL('image/jpeg', 1.0);
+
+          if (type === 'pdf') {
             if (i > 0) pdf.addPage();
-            pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+            pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
+          } else {
+            const link = document.createElement('a');
+            link.href = imgData;
+            link.download = `toner_etiket_sayfa_${i + 1}.jpg`;
+            link.click();
+          }
         }
-        
-        pdf.save(`Yazici_Etiketleri_${new Date().toLocaleDateString('tr-TR')}.pdf`);
+      }
+
+      if (type === 'pdf') {
+        pdf.save(`toner_etiketleri_${new Date().getTime()}.pdf`);
+      }
     } catch (error) {
-        console.error("PDF Generation Error:", error);
-        alert("PDF oluşturulurken bir hata oluştu. Lütfen tekrar deneyin.");
+      console.error("Hata:", error);
+      alert("İşlem sırasında bir hata oluştu.");
     } finally {
-        setGeneratingPdf(false);
+      setGenerating(null);
     }
   };
 
-  if (loading) return <LoadingScreen message="Etiket şablonları hazırlanıyor..." />;
+  if (loading) return <LoadingScreen message="Cihaz listesi hazırlanıyor..." />;
 
-  if (isPrintMode) {
-    // 4 columns x 4 rows = 16 labels per page
-    const pages = chunkArray(printers, 16); 
-    
-    return (
-      <div className="fixed inset-0 z-[100] bg-zinc-900 overflow-auto text-black custom-scrollbar">
-          {generatingPdf && (
-              <div className="fixed inset-0 z-[150] bg-black/80 backdrop-blur-md flex flex-col items-center justify-center text-white">
-                  <div className="bg-zinc-900 p-10 rounded-[3rem] border border-zinc-800 flex flex-col items-center gap-6 shadow-2xl">
-                      <div className="relative">
-                          <Loader2 size={64} className="text-emerald-500 animate-spin" />
-                          <div className="absolute inset-0 flex items-center justify-center">
-                              <FileText size={24} className="text-emerald-200" />
-                          </div>
-                      </div>
-                      <div className="text-center">
-                          <h3 className="text-xl font-black uppercase tracking-tighter">PDF OLUŞTURULUYOR</h3>
-                          <p className="text-zinc-500 text-xs mt-2 font-bold uppercase tracking-widest">Lütfen Bekleyin, Sayfalar İşleniyor...</p>
-                      </div>
-                  </div>
-              </div>
-          )}
+  const printerPages = chunkArray(printers.filter(p => selectedPrinters.includes(p.id)), 12);
 
-          <div className="sticky top-0 left-0 right-0 bg-zinc-950/90 backdrop-blur-md text-white p-6 shadow-2xl flex flex-col md:flex-row justify-between items-center print:hidden z-50 gap-4 border-b border-zinc-800">
-              <div className="flex items-center gap-4">
-                  <div className="bg-emerald-500 p-2 rounded-xl"><QrCode size={24}/></div>
-                  <div>
-                      <h2 className="text-xl font-black tracking-tighter uppercase">BASKI ÖNİZLEME (A4)</h2>
-                      <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest">{printers.length} Etiket | {pages.length} Sayfa | 4x4 Izgara</p>
-                  </div>
-              </div>
-              <div className="flex gap-3">
-                  <button onClick={() => setIsPrintMode(false)} className="bg-zinc-800 hover:bg-zinc-700 text-white px-6 py-3 rounded-2xl font-black text-xs tracking-widest transition-all">VAZGEÇ</button>
-                  <button 
-                    onClick={handleDownloadPdf} 
-                    disabled={generatingPdf}
-                    className="bg-emerald-600 hover:bg-emerald-500 text-white px-8 py-3 rounded-2xl font-black text-xs tracking-widest shadow-xl shadow-emerald-500/20 transition-all flex items-center gap-2 disabled:opacity-50"
-                  >
-                      {generatingPdf ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />} 
-                      PDF OLARAK İNDİR
-                  </button>
-              </div>
-          </div>
-
-          <div id="printable-area" className="flex flex-col items-center gap-10 p-10 print:p-0 print:gap-0 print:block bg-zinc-100 print:bg-white">
-              {pages.map((pagePrinters, pageIndex) => (
-                  <div key={pageIndex} className="flex flex-col gap-4 print:block mb-10 print:mb-0">
-                      <div className="flex justify-between items-end print:hidden px-2">
-                          <span className="text-zinc-500 text-xs font-black uppercase tracking-widest">SAYFA {pageIndex + 1} / {pages.length}</span>
-                      </div>
-
-                      <div 
-                        className="a4-page-capture bg-white shadow-2xl print:shadow-none w-[210mm] h-[297mm] p-[12mm] grid grid-cols-4 grid-rows-4 gap-4 content-start relative mx-auto border border-zinc-200 print:border-none" 
-                        style={{ pageBreakAfter: 'always' }}
-                      >
-                          {pagePrinters.map((p) => {
-                             const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(window.location.origin + window.location.pathname + '?pid=' + p.id + '&sc=' + (p.shortCode || ''))}`;
-                             return (
-                                 <div key={p.id} className="border-[1.5px] border-zinc-200 print:border-zinc-300 rounded-[2.5rem] p-4 flex flex-col items-center justify-between text-center h-[66mm] overflow-hidden relative print-color-adjust">
-                                      <div className="w-full">
-                                          <p className="font-black text-[9px] uppercase leading-tight truncate px-1 text-zinc-900 mb-0.5">{p.brand} {p.model}</p>
-                                          <div className="bg-zinc-900 text-white text-[7px] font-black px-2 py-0.5 rounded-lg tracking-[0.1em] uppercase truncate inline-block max-w-[95%]">{p.location}</div>
-                                      </div>
-
-                                      <div className="w-full flex justify-center py-1">
-                                          <div className="p-1.5 bg-white rounded-2xl border-2 border-zinc-50 shadow-sm">
-                                            <img src={qrUrl} alt="QR" className="w-[32mm] h-[32mm] object-contain" crossOrigin="anonymous" />
-                                          </div>
-                                      </div>
-                                      
-                                      <div className="w-full">
-                                          <div className="mb-1 flex items-center justify-center gap-1">
-                                              {p.connectionType === 'Network' ? (
-                                                  <span className="text-[8px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100 uppercase flex items-center gap-1">
-                                                      <Globe size={10} /> {p.ipAddress}
-                                                  </span>
-                                              ) : (
-                                                  <span className="text-[8px] font-black text-zinc-500 bg-zinc-50 px-2 py-0.5 rounded-md border border-zinc-100 uppercase">
-                                                      USB BAĞLANTI
-                                                  </span>
-                                              )}
-                                          </div>
-                                          <div className="flex justify-between items-center px-1 border-t border-zinc-100 pt-1.5 mt-0.5">
-                                              <p className="text-[7px] text-zinc-400 font-mono font-bold truncate max-w-[45%]">{p.serialNumber}</p>
-                                              <p className="text-[12px] font-black text-emerald-600 tracking-tighter">#{p.shortCode}</p>
-                                          </div>
-                                      </div>
-                                 </div>
-                             )
-                          })}
-                      </div>
-                  </div>
-              ))}
-          </div>
-
-          <style>{`
-              @media print {
-                  @page { size: A4; margin: 0; }
-                  body { visibility: hidden; background: white; }
-                  #root { display: none !important; }
-                  #printable-area, #printable-area * { visibility: visible; }
-                  #printable-area { position: absolute; left: 0; top: 0; width: 210mm; margin: 0; padding: 0; display: block !important; }
-                  .print\\:hidden { display: none !important; }
-                  .print-color-adjust { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-              }
-          `}</style>
-      </div>
-    );
-  }
+  // QR URL'sini oluştur
+  const getQrUrl = (sc: string) => {
+      const baseUrl = config?.appUrl || window.location.origin + window.location.pathname;
+      const cleanBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+      const url = new URL(cleanBase);
+      url.searchParams.set('sc', sc);
+      return url.toString();
+  };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
-      <div className="bg-white dark:bg-zinc-950 p-10 rounded-[3rem] shadow-2xl border border-zinc-100 dark:border-zinc-900 relative overflow-hidden group">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 blur-3xl -mr-32 -mt-32"></div>
-        <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-6">
+    <div className="space-y-8 pb-32">
+      {/* Üst Kontrol Paneli */}
+      <div className="bg-white dark:bg-zinc-950 p-8 rounded-[2.5rem] shadow-2xl border border-zinc-100 dark:border-zinc-900 flex flex-col md:flex-row justify-between items-center gap-6">
+        <div className="flex items-center gap-5">
+            <div className="p-4 bg-blue-500/10 text-blue-500 rounded-3xl border border-blue-500/20"><QrCode size={40} strokeWidth={2.5}/></div>
             <div>
-                <h2 className="text-4xl font-black text-zinc-900 dark:text-white flex items-center gap-4 tracking-tighter uppercase">
-                   <QrCode size={48} className="text-emerald-500" /> QR & Etiket Merkezi
-                </h2>
-                <p className="text-zinc-500 dark:text-zinc-400 mt-4 text-lg font-medium max-w-2xl">Laminasyon işlemi için 4x4 grid düzeninde (A4 başına 16 etiket) profesyonel baskı alabilirsiniz.</p>
+                <h2 className="text-3xl font-black text-zinc-900 dark:text-white tracking-tighter uppercase leading-none">ETİKET YÖNETİMİ</h2>
+                <p className="text-zinc-500 dark:text-zinc-400 font-bold uppercase tracking-widest mt-2 text-[10px]">Netleştirilmiş 45mm QR Kod Etiketleri</p>
             </div>
-            <button onClick={loadData} className="p-4 bg-zinc-100 dark:bg-zinc-900 rounded-2xl hover:text-emerald-500 transition-all"><RefreshCw size={24}/></button>
+        </div>
+        <div className="flex flex-wrap gap-3 w-full md:w-auto justify-center">
+            <button onClick={selectAll} className="px-6 py-4 rounded-2xl border border-zinc-100 dark:border-zinc-800 text-zinc-500 font-black text-[10px] uppercase tracking-widest hover:bg-zinc-50 dark:hover:bg-zinc-900">
+                {selectedPrinters.length === printers.length ? 'TEMİZLE' : 'HEPSİNİ SEÇ'}
+            </button>
+            <button onClick={() => handleDownload('jpeg')} disabled={selectedPrinters.length === 0 || !!generating} className="bg-zinc-900 text-white px-8 py-4 rounded-2xl font-black shadow-xl disabled:opacity-50 transition-all flex items-center gap-3 text-[10px] tracking-widest uppercase">
+                {generating === 'jpeg' ? <Loader2 className="animate-spin" size={18}/> : <ImageIcon size={18} />} JPG
+            </button>
+            <button onClick={() => handleDownload('pdf')} disabled={selectedPrinters.length === 0 || !!generating} className="bg-blue-600 text-white px-10 py-4 rounded-2xl font-black shadow-xl shadow-blue-500/20 disabled:opacity-50 transition-all flex items-center gap-3 text-[10px] tracking-widest uppercase">
+                {generating === 'pdf' ? <Loader2 className="animate-spin" size={18}/> : <Download size={18} />} PDF
+            </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <div className="bg-emerald-50/50 dark:bg-emerald-950/20 border-2 border-emerald-100/50 dark:border-emerald-500/10 p-10 rounded-[3rem] relative overflow-hidden">
-              <h3 className="font-black text-emerald-900 dark:text-emerald-400 mb-8 text-2xl uppercase">ETİKET YAPISI</h3>
-              <div className="space-y-6">
-                  <div className="flex items-center gap-5">
-                      <div className="bg-emerald-500 text-white p-2.5 rounded-2xl shadow-lg"><Globe size={24} strokeWidth={3}/></div>
-                      <span className="text-emerald-900 dark:text-emerald-100 font-black text-sm uppercase">IP ADRESİ BİLGİSİ EKLENDİ</span>
-                  </div>
-                  <div className="flex items-center gap-5">
-                      <div className="bg-emerald-500 text-white p-2.5 rounded-2xl shadow-lg"><Layers size={24} strokeWidth={3}/></div>
-                      <span className="text-emerald-900 dark:text-emerald-100 font-black text-sm uppercase">QR + HIZLI KOD (#) ENTEGRASYONU</span>
-                  </div>
-                  <div className="flex items-center gap-5">
-                      <div className="bg-emerald-500 text-white p-2.5 rounded-2xl shadow-lg"><FileText size={24} strokeWidth={3}/></div>
-                      <span className="text-emerald-900 dark:text-emerald-100 font-black text-sm uppercase">16'LI LAMİNASYON VE KESİM UYUMLU</span>
-                  </div>
-              </div>
-          </div>
+      {/* Seçim Grid Listesi */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {printers.map(printer => (
+            <div key={printer.id} onClick={() => toggleSelect(printer.id)} className={`p-6 rounded-[2.5rem] border transition-all cursor-pointer relative group flex flex-col justify-between h-44 ${selectedPrinters.includes(printer.id) ? 'bg-blue-600 border-blue-500 shadow-xl' : 'bg-white dark:bg-zinc-950 border-zinc-100 dark:border-zinc-900'}`}>
+                <div className="flex justify-between items-start">
+                    <div className={`p-2 rounded-xl ${selectedPrinters.includes(printer.id) ? 'bg-white/20 text-white' : 'bg-zinc-100 dark:bg-zinc-900 text-zinc-400'}`}>
+                        <PrinterIcon size={18} />
+                    </div>
+                    {selectedPrinters.includes(printer.id) && <CheckCircle2 size={24} className="text-white" />}
+                </div>
+                <div>
+                    <h3 className={`font-black text-sm uppercase tracking-tighter truncate ${selectedPrinters.includes(printer.id) ? 'text-white' : 'text-zinc-900 dark:text-white'}`}>{printer.model}</h3>
+                    <p className={`text-[9px] font-bold uppercase mt-1 tracking-widest ${selectedPrinters.includes(printer.id) ? 'text-blue-100' : 'text-zinc-500'}`}>{printer.location}</p>
+                </div>
+                <div className={`absolute bottom-4 right-6 font-mono font-black text-lg ${selectedPrinters.includes(printer.id) ? 'text-white/40' : 'text-zinc-100 dark:text-zinc-900'}`}>#{printer.shortCode}</div>
+            </div>
+        ))}
+      </div>
 
-          <div className="bg-white dark:bg-zinc-950 p-10 rounded-[3rem] border border-zinc-100 dark:border-zinc-900 flex flex-col items-center justify-center text-center shadow-xl group hover:border-emerald-500/30 transition-all">
-             <div className="p-8 bg-zinc-50 dark:bg-zinc-900 rounded-[2.5rem] mb-8 transform group-hover:scale-110 transition-transform"><PrinterIcon size={64} className="text-zinc-400 dark:text-zinc-600" /></div>
-             <h3 className="font-black text-zinc-900 dark:text-white text-2xl mb-4 uppercase">ETİKETLERİ HAZIRLA</h3>
-             <p className="text-sm text-zinc-500 mb-10 max-w-xs font-medium">Toplam {printers.length} adet cihaz için IP adresli PDF sayfaları oluşturulacaktır.</p>
-             <button onClick={() => setIsPrintMode(true)} className="w-full max-w-xs bg-emerald-600 hover:bg-emerald-500 text-white font-black py-6 rounded-[2rem] shadow-2xl transition-all active:scale-95 flex items-center justify-center gap-3 text-sm tracking-widest uppercase">
-                <Download size={24} strokeWidth={2.5} /> BASKI ŞABLONUNU AÇ
-             </button>
+      {/* GİZLİ SAYFALAMA ALANI (KESİN ÖLÇÜLÜ ETİKETLER) */}
+      <div style={{ position: 'absolute', left: '-9999px', top: 0 }}>
+        {printerPages.map((pagePrinters, pageIdx) => (
+          <div key={pageIdx} id={`page-${pageIdx}`} style={{ width: '210mm', height: '297mm', padding: '10mm', backgroundColor: 'white', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gridTemplateRows: 'repeat(4, 1fr)', gap: '4mm', boxSizing: 'border-box' }}>
+            {pagePrinters.map((printer) => (
+              <div key={printer.id} style={{ width: '63mm', height: '90mm', border: '0.4mm solid #e2e8f0', borderRadius: '10mm', backgroundColor: 'white', position: 'relative', overflow: 'hidden', boxSizing: 'border-box' }}>
+                {/* HEADER (20mm) */}
+                <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '20mm', textAlign: 'center', padding: '4mm 2mm' }}>
+                    <div style={{ fontSize: '10pt', fontWeight: '900', color: '#1e293b', textTransform: 'uppercase', lineHeight: '1.2', marginBottom: '1.5mm' }}>{printer.brand} {printer.model}</div>
+                    <div style={{ backgroundColor: '#0f172a', color: 'white', fontSize: '7.5pt', fontWeight: '800', borderRadius: '4mm', padding: '1.5mm 4mm', display: 'inline-block', textTransform: 'uppercase' }}>{printer.location}</div>
+                </div>
+                {/* QR KOD (BÜYÜTÜLDÜ 45mm) */}
+                <div style={{ position: 'absolute', top: '22mm', left: 0, width: '100%', height: '48mm', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <img src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(getQrUrl(printer.shortCode || ''))}`} style={{ width: '45mm', height: '45mm' }} alt="QR" />
+                </div>
+                {/* FOOTER (20mm) */}
+                <div style={{ position: 'absolute', bottom: 0, left: 0, width: '100%', height: '20mm', padding: '0 4mm' }}>
+                    <div style={{ position: 'absolute', bottom: '5mm', left: '4mm', display: 'flex', alignItems: 'center', gap: '1.5mm', backgroundColor: '#f1f5f9', border: '0.1mm solid #e2e8f0', borderRadius: '2mm', padding: '2mm 4mm' }}>
+                        <div style={{ width: '2mm', height: '2mm', borderRadius: '50%', backgroundColor: '#3b82f6' }}></div>
+                        <span style={{ fontSize: '8pt', fontWeight: '900', color: '#1e293b', fontFamily: 'monospace' }}>{printer.connectionType === 'Network' ? (printer.ipAddress || 'AUTO IP') : 'USB'}</span>
+                    </div>
+                    <div style={{ position: 'absolute', bottom: '4mm', right: '4mm', fontSize: '20pt', fontWeight: '950', color: '#10b981', fontFamily: 'monospace', letterSpacing: '-1mm' }}>#{printer.shortCode}</div>
+                </div>
+              </div>
+            ))}
           </div>
+        ))}
       </div>
     </div>
   );

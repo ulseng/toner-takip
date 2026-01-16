@@ -74,6 +74,9 @@ const PrinterCard = memo(({ printer, onOpen, onEdit, onDelete, modelImage }: {
               ) : (
                   <span className="bg-zinc-800 text-zinc-500 px-3 py-1 rounded-lg text-[9px] font-black uppercase border border-white/5 flex items-center gap-1"><Usb size={12}/> USB BAĞLANTI</span>
               )}
+              {printer.compatibleToner && (
+                  <span className="bg-orange-500/10 text-orange-500 px-3 py-1 rounded-lg text-[9px] font-black uppercase border border-orange-500/20 flex items-center gap-1"><Droplet size={12}/> {printer.compatibleToner}</span>
+              )}
           </div>
 
           <div className="pt-5 border-t border-white/5 flex justify-between items-center">
@@ -122,7 +125,7 @@ export const PrinterList: React.FC<PrinterListProps> = ({ targetPrinterId, clear
 
   const [formData, setFormData] = useState<Partial<PrinterType>>({
     brand: '', model: '', serialNumber: '', shortCode: '', location: '', floor: '',
-    lastCounter: 0, connectionType: 'USB', ipAddress: '', status: 'ACTIVE'
+    lastCounter: 0, compatibleToner: '', connectionType: 'USB', ipAddress: '', status: 'ACTIVE'
   });
 
   const [isCustomBrand, setIsCustomBrand] = useState(false);
@@ -197,7 +200,7 @@ export const PrinterList: React.FC<PrinterListProps> = ({ targetPrinterId, clear
       setIsCustomModel(!config.models.includes(printer.model));
       setCustomModel(config.models.includes(printer.model) ? '' : printer.model);
     } else {
-      setEditingPrinter(null); setFormData({ brand: config.brands[0] || '', model: config.models[0] || '', status: 'ACTIVE', connectionType: 'USB' });
+      setEditingPrinter(null); setFormData({ brand: config.brands[0] || '', model: config.models[0] || '', compatibleToner: '', status: 'ACTIVE', connectionType: 'USB' });
       setIsCustomBrand(false); setIsCustomModel(false); setCustomBrand(''); setCustomModel('');
     }
     setIsFormModalOpen(true);
@@ -226,6 +229,7 @@ export const PrinterList: React.FC<PrinterListProps> = ({ targetPrinterId, clear
     else setShowDetailScrollTop(false);
   };
 
+  // Fixed ReferenceError: added quotes around 'smooth' to make it a string literal
   const scrollToDetailTop = () => {
     detailScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -465,6 +469,14 @@ export const PrinterList: React.FC<PrinterListProps> = ({ targetPrinterId, clear
                       {config.models.map(m => <option key={m} value={m}>{m}</option>)}
                     </select>
                   </div>
+              </div>
+
+              <div className="space-y-3">
+                <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-2">UYUMLU TONER MODELİ</label>
+                <select className="w-full p-4 border border-white/10 rounded-2xl bg-zinc-900 text-white font-black outline-none focus:border-orange-500" value={formData.compatibleToner} onChange={e => setFormData({...formData, compatibleToner: e.target.value})}>
+                  <option value="">Toner Seçiniz</option>
+                  {config.tonerModels.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
