@@ -1,13 +1,12 @@
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Save, Tag, Box, MessageCircle, Truck, RefreshCw, Edit2, X, AlertTriangle, Droplet, Database, CheckCircle2, Loader2, ArrowRight, Image as ImageIcon, Link as LinkIcon, Printer, ShieldCheck } from 'lucide-react';
+import { Plus, Trash2, Save, Tag, Box, MessageCircle, Truck, RefreshCw, Edit2, X, AlertTriangle, Droplet, Database, CheckCircle2, Loader2, ArrowRight, Image as ImageIcon, Link as LinkIcon, Printer, ShieldCheck, Globe } from 'lucide-react';
 import { StorageService } from '../services/storage';
 import { SystemConfig, Printer as PrinterType } from '../types';
 import { LoadingScreen } from './LoadingScreen';
 
 type ConfigType = 'brands' | 'models' | 'suppliers' | 'tonerModels';
 
-// UPDATED DATA: Sequential 4-digit Short Codes (1001-1040)
 export const INITIAL_PRINTER_DATA = [
   { s: 'QTS15057', ip: '236', m: 'iRC3325i', l: 'MUHASEBE', sc: '1001' },
   { s: '34X19121', ip: '132', m: 'iR1643i', l: 'ARKA BANKO', sc: '1002' },
@@ -52,19 +51,15 @@ export const INITIAL_PRINTER_DATA = [
 ];
 
 export const Settings: React.FC = () => {
-  const [config, setConfig] = useState<SystemConfig>({ brands: [], models: [], suppliers: [], tonerModels: [], brandImages: {}, modelImages: {} });
+  const [config, setConfig] = useState<SystemConfig>({ brands: [], models: [], suppliers: [], tonerModels: [], brandImages: {}, modelImages: {}, appUrl: '' });
   const [printers, setPrinters] = useState<PrinterType[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // Import States
   const [showImportConfirm, setShowImportConfirm] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [importProgress, setImportProgress] = useState(0);
-  
-  // Maintenance States
   const [isFixingCodes, setIsFixingCodes] = useState(false);
 
-  // Input States
   const [newBrand, setNewBrand] = useState('');
   const [newBrandImage, setNewBrandImage] = useState('');
   const [newModel, setNewModel] = useState('');
@@ -72,23 +67,12 @@ export const Settings: React.FC = () => {
   const [newSupplier, setNewSupplier] = useState('');
   const [newTonerModel, setNewTonerModel] = useState('');
   const [whatsappNumber, setWhatsappNumber] = useState('');
+  const [appUrl, setAppUrl] = useState('');
 
   const [editModal, setEditModal] = useState<{ type: ConfigType, oldVal: string, newVal: string, newImage?: string } | null>(null);
   const [deleteModal, setDeleteModal] = useState<{ type: ConfigType, val: string } | null>(null);
 
   useEffect(() => { loadData(); }, []);
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        if (editModal) setEditModal(null);
-        if (deleteModal) setDeleteModal(null);
-        if (showImportConfirm) setShowImportConfirm(false);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [editModal, deleteModal, showImportConfirm]);
 
   const loadData = async () => {
     setLoading(true);
@@ -96,29 +80,32 @@ export const Settings: React.FC = () => {
     const p = await StorageService.getPrinters();
     setConfig(c);
     setWhatsappNumber(c.whatsappNumber || '');
+    setAppUrl(c.appUrl || '');
     setPrinters(p);
     setLoading(false);
+  };
+
+  const handleSaveAppUrl = async () => {
+    const updatedConfig = { ...config, appUrl: appUrl.trim() };
+    await StorageService.saveConfig(updatedConfig);
+    setConfig(updatedConfig);
+    alert('Uygulama URL adresi kaydedildi. QR kodlar bu adrese göre oluşturulacaktır.');
   };
 
   const handleInitialImport = async () => {
     setShowImportConfirm(false);
     setIsImporting(true);
-    setImportProgress(0);
-
     try {
         let count = 0;
         for (const item of INITIAL_PRINTER_DATA) {
             const isUsb = item.ip === 'USB' || item.ip === '-' || item.ip === '' || item.ip === null;
             const connectionType = isUsb ? 'USB' : 'Network';
             let ipAddress = '';
-            if (!isUsb) {
-                ipAddress = item.ip.length <= 3 ? `192.168.1.${item.ip}` : item.ip;
-            }
-
+            if (!isUsb) { ipAddress = item.ip.length <= 3 ? `192.168.1.${item.ip}` : item.ip; }
             const newPrinter: PrinterType = {
                 id: '',
                 serialNumber: item.s,
-                shortCode: item.sc, // Use pre-defined short code
+                shortCode: item.sc,
                 brand: 'Canon',
                 model: item.m,
                 location: item.l,
@@ -131,7 +118,6 @@ export const Settings: React.FC = () => {
                 supplier: 'Anahtar Bilgisayar',
                 status: 'ACTIVE',
                 connectedUsers: [],
-                // Fix: Add missing monthlyRentalCost property to satisfy Printer interface
                 monthlyRentalCost: 0
             };
             await StorageService.addPrinter(newPrinter);
@@ -140,27 +126,18 @@ export const Settings: React.FC = () => {
             await new Promise(resolve => setTimeout(resolve, 30));
         }
         await loadData();
-        alert(`İŞLEM BAŞARILI!\nToplam ${count} adet yazıcı sisteme kaydedildi.`);
-    } catch (e) {
-        alert('İçe aktarma hatası.');
-    } finally {
-        setIsImporting(false);
-    }
+        alert(`Toplam ${count} adet yazıcı sisteme kaydedildi.`);
+    } catch (e) { alert('İçe aktarma hatası.'); } finally { setIsImporting(false); }
   };
 
   const handleFixCodes = async () => {
-    if (!confirm("Veritabanında Hızlı Kodu eksik olan veya 1000'den küçük olan tüm yazıcılara otomatik olarak 4 haneli kod atanacaktır. Devam edilsin mi?")) return;
-    
+    if (!confirm("Hızlı Kodu eksik olanlara otomatik kod atanacaktır. Devam edilsin mi?")) return;
     setIsFixingCodes(true);
     try {
       const count = await StorageService.fixMissingShortCodes();
       await loadData();
       alert(`Onarım tamamlandı. ${count} yazıcıya yeni Hızlı Kod atandı.`);
-    } catch (e) {
-      alert("Hata oluştu.");
-    } finally {
-      setIsFixingCodes(false);
-    }
+    } catch (e) { alert("Hata oluştu."); } finally { setIsFixingCodes(false); }
   };
 
   const handleAddItem = async (e: React.FormEvent, type: ConfigType, value: string, setter: (s: string) => void, imageValue?: string, imageSetter?: (s: string) => void) => {
@@ -248,13 +225,6 @@ export const Settings: React.FC = () => {
     alert('Numara kaydedildi.');
   };
 
-  const manualMaintenance = async () => {
-    setLoading(true);
-    await loadData();
-    alert('Veritabanı senkronize edildi.');
-    setLoading(false);
-  };
-
   const renderList = (type: ConfigType, items: string[]) => (
     <div className="space-y-2 max-h-64 overflow-y-auto pr-1 custom-scrollbar">
       {items.map((item, idx) => (
@@ -288,20 +258,29 @@ export const Settings: React.FC = () => {
         <h2 className="text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
           <Save size={24} className="text-primary-600 dark:text-primary-400" /> Sistem Ayarları
         </h2>
-        <button onClick={manualMaintenance} className="text-xs bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 text-slate-600 dark:text-slate-300 px-3 py-2 rounded-lg flex items-center gap-1"><RefreshCw size={14} /> Senkronize Et</button>
+        <button onClick={() => { StorageService.getConfig().then(c => { setConfig(c); alert('Senkronize edildi.'); }) }} className="text-xs bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 text-slate-600 dark:text-slate-300 px-3 py-2 rounded-lg flex items-center gap-1"><RefreshCw size={14} /> Senkronize Et</button>
+      </div>
+
+      <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700">
+        <h3 className="text-lg font-bold text-slate-700 dark:text-slate-200 mb-2 flex items-center gap-2">
+            <Globe size={20} className="text-blue-500" /> Uygulama Genel URL Adresi
+        </h3>
+        <p className="text-xs text-slate-400 mb-4">APK üzerinden QR oluştururken domain DNS hatasını önlemek için Vercel veya IP adresinizi buraya girin (Örn: https://toner.vercel.app).</p>
+        <div className="flex gap-2">
+           <input type="url" placeholder="https://..." className="flex-1 p-3 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-white" value={appUrl} onChange={(e) => setAppUrl(e.target.value)} />
+           <button onClick={handleSaveAppUrl} className="bg-blue-600 text-white px-6 py-2 rounded-xl font-medium">Kaydet</button>
+        </div>
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Bulk Import */}
-        <div className="bg-zinc-900 p-6 rounded-xl shadow-lg border border-zinc-700 relative overflow-hidden">
+        <div className="bg-zinc-900 p-6 rounded-xl shadow-lg border border-zinc-700">
           <h3 className="text-lg font-bold text-white mb-2 flex items-center gap-2"><Database size={20} className="text-emerald-400" /> İlk Kurulum Aracı</h3>
           <p className="text-zinc-400 text-xs mb-4">40 adet yazıcıyı önceden tanımlı Hızlı Kodlar (#1001-1040) ile kaydeder.</p>
           {isImporting ? (
                <div className="w-full bg-emerald-900/50 rounded-xl p-4 border border-emerald-500/30 flex items-center gap-3">
                   <Loader2 size={24} className="text-emerald-400 animate-spin" />
                   <div className="flex-1">
-                      <p className="text-emerald-100 font-bold text-sm">Cihazlar Yükleniyor...</p>
-                      <p className="text-emerald-400 text-xs">{importProgress} / {INITIAL_PRINTER_DATA.length}</p>
+                      <p className="text-emerald-100 font-bold text-sm">Cihazlar Yükleniyor... {importProgress} / {INITIAL_PRINTER_DATA.length}</p>
                   </div>
                </div>
           ) : (
@@ -309,17 +288,11 @@ export const Settings: React.FC = () => {
           )}
         </div>
 
-        {/* Fix Short Codes Maintenance */}
-        <div className="bg-blue-900 p-6 rounded-xl shadow-lg border border-blue-700 relative overflow-hidden">
+        <div className="bg-blue-900 p-6 rounded-xl shadow-lg border border-blue-700">
           <h3 className="text-lg font-bold text-white mb-2 flex items-center gap-2"><ShieldCheck size={20} className="text-blue-300" /> Hızlı Kod Onarımı</h3>
-          <p className="text-blue-200 text-xs mb-4">Mevcut tüm yazıcıları tarar ve Hızlı Kodu eksik olanlara 1000'den başlayan 4 haneli kodlar atar.</p>
-          <button 
-            disabled={isFixingCodes}
-            onClick={handleFixCodes} 
-            className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl shadow-lg flex items-center justify-center gap-2"
-          >
-            {isFixingCodes ? <Loader2 className="animate-spin" /> : <RefreshCw size={18} />}
-            Kodları Düzenle (Toplu)
+          <p className="text-blue-200 text-xs mb-4">Eksik Hızlı Kodları (#1000+) otomatik atar.</p>
+          <button disabled={isFixingCodes} onClick={handleFixCodes} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl shadow-lg flex items-center justify-center gap-2">
+            {isFixingCodes ? <Loader2 className="animate-spin" /> : <RefreshCw size={18} />} Kodları Düzenle
           </button>
         </div>
       </div>
@@ -328,12 +301,9 @@ export const Settings: React.FC = () => {
         <div className="fixed inset-0 bg-black/80 z-[70] flex items-center justify-center p-4">
             <div className="bg-zinc-800 p-6 rounded-2xl border border-zinc-600 max-w-sm w-full text-center">
                 <AlertTriangle size={48} className="text-yellow-400 mx-auto mb-4"/>
-                <p className="text-white font-bold mb-2">Onaylıyor musunuz?</p>
-                <p className="text-zinc-400 text-xs mb-6">Bu işlem önceden tanımlı 40 adet cihazı sisteme ekleyecektir. Aynı seri numaralı cihazlar varsa kopyalanabilir.</p>
-                <div className="flex gap-3">
-                    <button onClick={() => setShowImportConfirm(false)} className="flex-1 py-3 bg-zinc-700 text-white rounded-xl">Vazgeç</button>
-                    <button onClick={handleInitialImport} className="flex-1 py-3 bg-emerald-600 text-white rounded-xl font-bold">Yükle</button>
-                </div>
+                <p className="text-white font-bold mb-2">Kurulum Onayı</p>
+                <p className="text-zinc-400 text-xs mb-6">40 adet örnek cihaz eklenecektir.</p>
+                <div className="flex gap-3"><button onClick={() => setShowImportConfirm(false)} className="flex-1 py-3 bg-zinc-700 text-white rounded-xl">Vazgeç</button><button onClick={handleInitialImport} className="flex-1 py-3 bg-emerald-600 text-white rounded-xl font-bold">Yükle</button></div>
             </div>
         </div>
       )}

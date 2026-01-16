@@ -118,6 +118,7 @@ export interface SystemConfig {
   suppliers: string[];
   tonerModels: string[];
   whatsappNumber?: string;
+  appUrl?: string;
   brandImages?: Record<string, string>; 
   modelImages?: Record<string, string>;
 }
