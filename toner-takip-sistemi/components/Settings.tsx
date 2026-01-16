@@ -59,6 +59,7 @@ export const Settings: React.FC = () => {
   const [isImporting, setIsImporting] = useState(false);
   const [importProgress, setImportProgress] = useState(0);
   const [isFixingCodes, setIsFixingCodes] = useState(false);
+  const [isSavingUrl, setIsSavingUrl] = useState(false);
 
   const [newBrand, setNewBrand] = useState('');
   const [newBrandImage, setNewBrandImage] = useState('');
@@ -86,10 +87,25 @@ export const Settings: React.FC = () => {
   };
 
   const handleSaveAppUrl = async () => {
-    const updatedConfig = { ...config, appUrl: appUrl.trim() };
-    await StorageService.saveConfig(updatedConfig);
-    setConfig(updatedConfig);
-    alert('Uygulama URL adresi kaydedildi. QR kodlar bu adrese göre oluşturulacaktır.');
+    const trimmedUrl = appUrl.trim();
+    if (!trimmedUrl) {
+        alert('Lütfen geçerli bir URL giriniz.');
+        return;
+    }
+    
+    setIsSavingUrl(true);
+    try {
+        const updatedConfig = { ...config, appUrl: trimmedUrl };
+        await StorageService.saveConfig(updatedConfig);
+        // Konfigürasyonu anlık güncelle
+        setConfig(updatedConfig);
+        alert('Uygulama URL adresi başarıyla kaydedildi. QR kodlar artık bu adresi kullanacak.');
+        loadData(); // Verileri tazelemek için tekrar çek
+    } catch (e) {
+        alert('Kaydetme sırasında bir hata oluştu.');
+    } finally {
+        setIsSavingUrl(false);
+    }
   };
 
   const handleInitialImport = async () => {
@@ -258,17 +274,54 @@ export const Settings: React.FC = () => {
         <h2 className="text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
           <Save size={24} className="text-primary-600 dark:text-primary-400" /> Sistem Ayarları
         </h2>
-        <button onClick={() => { StorageService.getConfig().then(c => { setConfig(c); alert('Senkronize edildi.'); }) }} className="text-xs bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 text-slate-600 dark:text-slate-300 px-3 py-2 rounded-lg flex items-center gap-1"><RefreshCw size={14} /> Senkronize Et</button>
+        <button onClick={loadData} className="text-xs bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 text-slate-600 dark:text-slate-300 px-3 py-2 rounded-lg flex items-center gap-1"><RefreshCw size={14} /> Yenile</button>
       </div>
 
       <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700">
         <h3 className="text-lg font-bold text-slate-700 dark:text-slate-200 mb-2 flex items-center gap-2">
             <Globe size={20} className="text-blue-500" /> Uygulama Genel URL Adresi
         </h3>
-        <p className="text-xs text-slate-400 mb-4">APK üzerinden QR oluştururken domain DNS hatasını önlemek için Vercel veya IP adresinizi buraya girin (Örn: https://toner.vercel.app).</p>
-        <div className="flex gap-2">
-           <input type="url" placeholder="https://..." className="flex-1 p-3 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-white" value={appUrl} onChange={(e) => setAppUrl(e.target.value)} />
-           <button onClick={handleSaveAppUrl} className="bg-blue-600 text-white px-6 py-2 rounded-xl font-medium">Kaydet</button>
+        <p className="text-xs text-zinc-400 mb-4 font-medium uppercase tracking-wider">APK ve dış taramalarda "DNS Hatası" almamak için sistemin internet adresini giriniz.</p>
+        
+        <div className="space-y-4">
+            <div className="flex gap-2">
+               <div className="relative flex-1">
+                   <LinkIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" size={18} />
+                   <input 
+                    type="text" 
+                    placeholder="https://proje-adin.vercel.app" 
+                    className="w-full pl-12 pr-4 py-4 border-2 border-zinc-100 dark:border-zinc-700 rounded-2xl bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white outline-none focus:border-blue-500 transition-all font-bold" 
+                    value={appUrl} 
+                    onChange={(e) => setAppUrl(e.target.value)} 
+                   />
+               </div>
+               <button 
+                onClick={handleSaveAppUrl} 
+                disabled={isSavingUrl}
+                className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-2xl font-black shadow-xl shadow-blue-500/20 active:scale-95 transition-all flex items-center gap-2 uppercase text-xs tracking-widest disabled:opacity-50"
+               >
+                 {isSavingUrl ? <Loader2 className="animate-spin" size={18} /> : <CheckCircle2 size={18} />}
+                 {isSavingUrl ? 'Kaydediliyor' : 'Kaydet'}
+               </button>
+            </div>
+            
+            {config.appUrl ? (
+                <div className="p-4 bg-emerald-50 dark:bg-emerald-950/30 rounded-2xl border border-emerald-100 dark:border-emerald-800 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-emerald-100 dark:bg-emerald-900 text-emerald-600 rounded-xl"><Globe size={16}/></div>
+                        <div>
+                            <p className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">AKTİF KAYITLI ADRES</p>
+                            <p className="text-sm font-bold text-zinc-700 dark:text-zinc-200">{config.appUrl}</p>
+                        </div>
+                    </div>
+                    <span className="text-[8px] font-black bg-emerald-500 text-white px-2 py-1 rounded-md uppercase">Çevrimiçi</span>
+                </div>
+            ) : (
+                <div className="p-4 bg-red-50 dark:bg-red-950/30 rounded-2xl border border-red-100 dark:border-red-800 flex items-center gap-3">
+                    <AlertTriangle size={20} className="text-red-500" />
+                    <p className="text-xs font-bold text-red-600 dark:text-red-400 uppercase tracking-tight">ADRES TANIMLANMAMIŞ! QR kodlar telefon kamerasında çalışmayabilir.</p>
+                </div>
+            )}
         </div>
       </div>
       

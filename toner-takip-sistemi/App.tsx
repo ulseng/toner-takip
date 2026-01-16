@@ -24,12 +24,21 @@ function App() {
   const [targetPrinterId, setTargetPrinterId] = useState<string | null>(null);
 
   useEffect(() => {
+    // 1. Kullanıcıyı Yükle
     const savedUser = localStorage.getItem('app_user');
-    if (savedUser) setUser(JSON.parse(savedUser));
+    if (savedUser) {
+        try {
+            setUser(JSON.parse(savedUser));
+        } catch (e) {
+            localStorage.removeItem('app_user');
+        }
+    }
     
+    // 2. Temayı Yükle
     const savedTheme = localStorage.getItem('app_theme');
     if (savedTheme === 'dark') setIsDarkMode(true);
 
+    // 3. QR/URL Parametrelerini Çöz
     const resolveUrlParams = async () => {
       const params = new URLSearchParams(window.location.search);
       const pid = params.get('pid');
@@ -37,30 +46,47 @@ function App() {
 
       if (pid) {
         setTargetPrinterId(pid);
+        // URL'yi temizle ama state'i koru
+        window.history.replaceState({}, document.title, window.location.pathname);
       } else if (sc) {
-        const printer = await StorageService.findPrinterByShortCode(sc);
-        if (printer) setTargetPrinterId(printer.id);
+        // Hızlı kod ile yazıcı id'sini bul
+        try {
+            const printer = await StorageService.findPrinterByShortCode(sc);
+            if (printer) {
+                setTargetPrinterId(printer.id);
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+        } catch (error) {
+            console.error("Yazıcı arama hatası:", error);
+        }
       }
     };
 
     resolveUrlParams();
   }, []);
 
+  // Kullanıcı giriş yaptıysa ve bir hedef yazıcı varsa direkt detayları gösteren sekmeye at
   useEffect(() => {
-    if (user && targetPrinterId) setActiveTab('printers');
+    if (user && targetPrinterId) {
+        setActiveTab('printers');
+    }
   }, [user, targetPrinterId]);
 
-  const handleLogin = (user: User) => {
-    localStorage.setItem('app_user', JSON.stringify(user));
-    setUser(user);
+  const handleLogin = (loggedInUser: User) => {
+    localStorage.setItem('app_user', JSON.stringify(loggedInUser));
+    setUser(loggedInUser);
+    // targetPrinterId zaten state'de olduğu için yukarıdaki useEffect yönlendirme yapacak
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('app_user');
-    setUser(null);
-    setActiveTab('dashboard');
-    setTargetPrinterId(null);
-    window.history.replaceState({}, '', window.location.pathname);
+    if (confirm("Sistemden çıkış yapmak istediğinize emin misiniz?")) {
+        localStorage.removeItem('app_user');
+        setUser(null);
+        setActiveTab('dashboard');
+        setTargetPrinterId(null);
+        // Tüm URL query'lerini temizle
+        window.history.replaceState({}, '', window.location.pathname);
+    }
   };
 
   const toggleTheme = () => {
@@ -83,7 +109,7 @@ function App() {
         activeTab={activeTab} 
         setActiveTab={setActiveTab} 
         onLogout={handleLogout} 
-        user={user}
+        user={user as any} // Desktop/Mobil farketmeksizin aynı logout tetiklenir
         isDarkMode={isDarkMode}
         toggleTheme={toggleTheme}
       >
@@ -92,7 +118,12 @@ function App() {
         {activeTab === 'scan' && <QrScanner />}
         {activeTab === 'qr' && <QrManagement />}
         {activeTab === 'notes' && <Notes user={user} />}
-        {activeTab === 'printers' && <PrinterList targetPrinterId={targetPrinterId} clearTarget={() => setTargetPrinterId(null)} />}
+        {activeTab === 'printers' && (
+            <PrinterList 
+                targetPrinterId={targetPrinterId} 
+                clearTarget={() => setTargetPrinterId(null)} 
+            />
+        )}
         {activeTab === 'inventory' && <Inventory />} 
         {activeTab === 'counters' && <CounterManagement user={user} />}
         {activeTab === 'service' && <ServiceManagement user={user} />}

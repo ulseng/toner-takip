@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { StorageService } from '../services/storage';
 import { Printer, SystemConfig } from '../types';
 import { LoadingScreen } from './LoadingScreen';
-import { Printer as PrinterIcon, QrCode, Download, Image as ImageIcon, CheckCircle2, Loader2, X, Layers } from 'lucide-react';
+import { Printer as PrinterIcon, QrCode, Download, Image as ImageIcon, CheckCircle2, Loader2, X, AlertTriangle, Settings } from 'lucide-react';
 
 declare const html2canvas: any;
 declare const jspdf: any;
@@ -49,10 +49,26 @@ export const QrManagement: React.FC = () => {
     return chunked;
   };
 
+  const getQrUrl = (sc: string) => {
+      // Eğer kullanıcı Ayarlar'da bir URL belirtmişse onu kullan, yoksa mevcut pencerenin adresini kullan.
+      // ÖNEMLİ: DNS hatası almamak için Ayarlar > Uygulama Genel URL Adresi kısmına 
+      // Vercel linkinizi (https://...vercel.app) girmeniz gerekir.
+      const baseUrl = config?.appUrl || window.location.origin + window.location.pathname;
+      const cleanBase = baseUrl.replace(/\/$/, ""); // Sondaki eğik çizgiyi kaldır
+      return `${cleanBase}?sc=${sc}`;
+  };
+
   const handleDownload = async (type: 'pdf' | 'jpeg') => {
     if (selectedPrinters.length === 0) return;
-    setGenerating(type);
+    
+    // DNS Hatası riskini önlemek için uyarı
+    if (!config?.appUrl) {
+        if (!confirm("UYARI: Ayarlar sayfasında 'Uygulama Genel URL Adresi' tanımlanmamış. QR kodlar sadece bu bilgisayarda çalışabilir, telefonda 'DNS Hatası' verebilir. Devam edilsin mi?")) {
+            return;
+        }
+    }
 
+    setGenerating(type);
     const selectedData = printers.filter(p => selectedPrinters.includes(p.id));
     const pages = chunkArray(selectedData, 12); 
 
@@ -65,7 +81,7 @@ export const QrManagement: React.FC = () => {
         
         if (pageElement) {
           const canvas = await html2canvas(pageElement, {
-            scale: 4, // Daha yüksek kalite için 4x
+            scale: 4,
             useCORS: true,
             logging: false,
             backgroundColor: '#ffffff'
@@ -100,17 +116,19 @@ export const QrManagement: React.FC = () => {
 
   const printerPages = chunkArray(printers.filter(p => selectedPrinters.includes(p.id)), 12);
 
-  // QR URL'sini oluştur
-  const getQrUrl = (sc: string) => {
-      const baseUrl = config?.appUrl || window.location.origin + window.location.pathname;
-      const cleanBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
-      const url = new URL(cleanBase);
-      url.searchParams.set('sc', sc);
-      return url.toString();
-  };
-
   return (
     <div className="space-y-8 pb-32">
+      {/* Uyarı Paneli (URL Tanımlı Değilse) */}
+      {!config?.appUrl && (
+          <div className="bg-amber-500/10 border border-amber-500/30 p-6 rounded-[2rem] flex items-center gap-4 text-amber-600 dark:text-amber-400">
+              <AlertTriangle size={32} />
+              <div className="flex-1">
+                  <p className="font-black text-sm uppercase tracking-tighter leading-none">DNS HATASI UYARISI</p>
+                  <p className="text-xs font-bold mt-1 opacity-80">Telefonda 'Siteye Ulaşılamıyor' hatası almamak için 'Ayarlar' sayfasından uygulamanın internet adresini kaydetmelisiniz.</p>
+              </div>
+          </div>
+      )}
+
       {/* Üst Kontrol Paneli */}
       <div className="bg-white dark:bg-zinc-950 p-8 rounded-[2.5rem] shadow-2xl border border-zinc-100 dark:border-zinc-900 flex flex-col md:flex-row justify-between items-center gap-6">
         <div className="flex items-center gap-5">
@@ -152,7 +170,7 @@ export const QrManagement: React.FC = () => {
         ))}
       </div>
 
-      {/* GİZLİ SAYFALAMA ALANI (KESİN ÖLÇÜLÜ ETİKETLER) */}
+      {/* GİZLİ SAYFALAMA ALANI (PDF İÇİN HER SAYFA AYRI RENDER EDİLİR) */}
       <div style={{ position: 'absolute', left: '-9999px', top: 0 }}>
         {printerPages.map((pagePrinters, pageIdx) => (
           <div key={pageIdx} id={`page-${pageIdx}`} style={{ width: '210mm', height: '297mm', padding: '10mm', backgroundColor: 'white', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gridTemplateRows: 'repeat(4, 1fr)', gap: '4mm', boxSizing: 'border-box' }}>
@@ -163,7 +181,7 @@ export const QrManagement: React.FC = () => {
                     <div style={{ fontSize: '10pt', fontWeight: '900', color: '#1e293b', textTransform: 'uppercase', lineHeight: '1.2', marginBottom: '1.5mm' }}>{printer.brand} {printer.model}</div>
                     <div style={{ backgroundColor: '#0f172a', color: 'white', fontSize: '7.5pt', fontWeight: '800', borderRadius: '4mm', padding: '1.5mm 4mm', display: 'inline-block', textTransform: 'uppercase' }}>{printer.location}</div>
                 </div>
-                {/* QR KOD (BÜYÜTÜLDÜ 45mm) */}
+                {/* QR KOD (45mm) */}
                 <div style={{ position: 'absolute', top: '22mm', left: 0, width: '100%', height: '48mm', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <img src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(getQrUrl(printer.shortCode || ''))}`} style={{ width: '45mm', height: '45mm' }} alt="QR" />
                 </div>
