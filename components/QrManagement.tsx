@@ -50,18 +50,14 @@ export const QrManagement: React.FC = () => {
   };
 
   const getQrUrl = (sc: string) => {
-      // Eğer kullanıcı Ayarlar'da bir URL belirtmişse onu kullan, yoksa mevcut pencerenin adresini kullan.
-      // ÖNEMLİ: DNS hatası almamak için Ayarlar > Uygulama Genel URL Adresi kısmına 
-      // Vercel linkinizi (https://...vercel.app) girmeniz gerekir.
       const baseUrl = config?.appUrl || window.location.origin + window.location.pathname;
-      const cleanBase = baseUrl.replace(/\/$/, ""); // Sondaki eğik çizgiyi kaldır
+      const cleanBase = baseUrl.replace(/\/$/, ""); 
       return `${cleanBase}?sc=${sc}`;
   };
 
   const handleDownload = async (type: 'pdf' | 'jpeg') => {
     if (selectedPrinters.length === 0) return;
     
-    // DNS Hatası riskini önlemek için uyarı
     if (!config?.appUrl) {
         if (!confirm("UYARI: Ayarlar sayfasında 'Uygulama Genel URL Adresi' tanımlanmamış. QR kodlar sadece bu bilgisayarda çalışabilir, telefonda 'DNS Hatası' verebilir. Devam edilsin mi?")) {
             return;
@@ -81,13 +77,15 @@ export const QrManagement: React.FC = () => {
         
         if (pageElement) {
           const canvas = await html2canvas(pageElement, {
-            scale: 4,
+            scale: 3, // Performans ve kalite dengesi
             useCORS: true,
             logging: false,
-            backgroundColor: '#ffffff'
+            backgroundColor: '#ffffff',
+            windowWidth: 794, // 210mm @ 96dpi
+            windowHeight: 1123 // 297mm @ 96dpi
           });
 
-          const imgData = canvas.toDataURL('image/jpeg', 1.0);
+          const imgData = canvas.toDataURL('image/jpeg', 0.95);
 
           if (type === 'pdf') {
             if (i > 0) pdf.addPage();
@@ -118,7 +116,6 @@ export const QrManagement: React.FC = () => {
 
   return (
     <div className="space-y-8 pb-32">
-      {/* Uyarı Paneli (URL Tanımlı Değilse) */}
       {!config?.appUrl && (
           <div className="bg-amber-500/10 border border-amber-500/30 p-6 rounded-[2rem] flex items-center gap-4 text-amber-600 dark:text-amber-400">
               <AlertTriangle size={32} />
@@ -129,13 +126,12 @@ export const QrManagement: React.FC = () => {
           </div>
       )}
 
-      {/* Üst Kontrol Paneli */}
       <div className="bg-white dark:bg-zinc-950 p-8 rounded-[2.5rem] shadow-2xl border border-zinc-100 dark:border-zinc-900 flex flex-col md:flex-row justify-between items-center gap-6">
         <div className="flex items-center gap-5">
             <div className="p-4 bg-blue-500/10 text-blue-500 rounded-3xl border border-blue-500/20"><QrCode size={40} strokeWidth={2.5}/></div>
             <div>
                 <h2 className="text-3xl font-black text-zinc-900 dark:text-white tracking-tighter uppercase leading-none">ETİKET YÖNETİMİ</h2>
-                <p className="text-zinc-500 dark:text-zinc-400 font-bold uppercase tracking-widest mt-2 text-[10px]">Netleştirilmiş 45mm QR Kod Etiketleri</p>
+                <p className="text-zinc-500 dark:text-zinc-400 font-bold uppercase tracking-widest mt-2 text-[10px]">A4 SAYFA BAŞI 12 ETİKET (62x67mm)</p>
             </div>
         </div>
         <div className="flex flex-wrap gap-3 w-full md:w-auto justify-center">
@@ -151,7 +147,6 @@ export const QrManagement: React.FC = () => {
         </div>
       </div>
 
-      {/* Seçim Grid Listesi */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {printers.map(printer => (
             <div key={printer.id} onClick={() => toggleSelect(printer.id)} className={`p-6 rounded-[2.5rem] border transition-all cursor-pointer relative group flex flex-col justify-between h-44 ${selectedPrinters.includes(printer.id) ? 'bg-blue-600 border-blue-500 shadow-xl' : 'bg-white dark:bg-zinc-950 border-zinc-100 dark:border-zinc-900'}`}>
@@ -170,28 +165,28 @@ export const QrManagement: React.FC = () => {
         ))}
       </div>
 
-      {/* GİZLİ SAYFALAMA ALANI (PDF İÇİN HER SAYFA AYRI RENDER EDİLİR) */}
+      {/* GİZLİ SAYFALAMA ALANI - A4 BOYUTLARI (210x297mm) */}
       <div style={{ position: 'absolute', left: '-9999px', top: 0 }}>
         {printerPages.map((pagePrinters, pageIdx) => (
-          <div key={pageIdx} id={`page-${pageIdx}`} style={{ width: '210mm', height: '297mm', padding: '10mm', backgroundColor: 'white', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gridTemplateRows: 'repeat(4, 1fr)', gap: '4mm', boxSizing: 'border-box' }}>
+          <div key={pageIdx} id={`page-${pageIdx}`} style={{ width: '210mm', height: '297mm', padding: '10mm', backgroundColor: 'white', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gridTemplateRows: 'repeat(4, 1fr)', gap: '3mm', boxSizing: 'border-box' }}>
             {pagePrinters.map((printer) => (
-              <div key={printer.id} style={{ width: '63mm', height: '90mm', border: '0.4mm solid #e2e8f0', borderRadius: '10mm', backgroundColor: 'white', position: 'relative', overflow: 'hidden', boxSizing: 'border-box' }}>
-                {/* HEADER (20mm) */}
-                <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '20mm', textAlign: 'center', padding: '4mm 2mm' }}>
-                    <div style={{ fontSize: '10pt', fontWeight: '900', color: '#1e293b', textTransform: 'uppercase', lineHeight: '1.2', marginBottom: '1.5mm' }}>{printer.brand} {printer.model}</div>
-                    <div style={{ backgroundColor: '#0f172a', color: 'white', fontSize: '7.5pt', fontWeight: '800', borderRadius: '4mm', padding: '1.5mm 4mm', display: 'inline-block', textTransform: 'uppercase' }}>{printer.location}</div>
+              <div key={printer.id} style={{ width: '62mm', height: '67mm', border: '0.3mm solid #e2e8f0', borderRadius: '6mm', backgroundColor: 'white', position: 'relative', overflow: 'hidden', boxSizing: 'border-box' }}>
+                {/* HEADER (15mm) */}
+                <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '15mm', textAlign: 'center', padding: '2mm 1mm' }}>
+                    <div style={{ fontSize: '8pt', fontWeight: '900', color: '#1e293b', textTransform: 'uppercase', lineHeight: '1.1', marginBottom: '1mm', whiteSpace: 'nowrap', overflow: 'hidden' }}>{printer.brand} {printer.model}</div>
+                    <div style={{ backgroundColor: '#0f172a', color: 'white', fontSize: '6pt', fontWeight: '800', borderRadius: '2mm', padding: '1mm 3mm', display: 'inline-block', textTransform: 'uppercase' }}>{printer.location}</div>
                 </div>
-                {/* QR KOD (45mm) */}
-                <div style={{ position: 'absolute', top: '22mm', left: 0, width: '100%', height: '48mm', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <img src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(getQrUrl(printer.shortCode || ''))}`} style={{ width: '45mm', height: '45mm' }} alt="QR" />
+                {/* QR KOD (35mm) */}
+                <div style={{ position: 'absolute', top: '16mm', left: 0, width: '100%', height: '35mm', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <img src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(getQrUrl(printer.shortCode || ''))}`} style={{ width: '33mm', height: '33mm' }} alt="QR" />
                 </div>
-                {/* FOOTER (20mm) */}
-                <div style={{ position: 'absolute', bottom: 0, left: 0, width: '100%', height: '20mm', padding: '0 4mm' }}>
-                    <div style={{ position: 'absolute', bottom: '5mm', left: '4mm', display: 'flex', alignItems: 'center', gap: '1.5mm', backgroundColor: '#f1f5f9', border: '0.1mm solid #e2e8f0', borderRadius: '2mm', padding: '2mm 4mm' }}>
-                        <div style={{ width: '2mm', height: '2mm', borderRadius: '50%', backgroundColor: '#3b82f6' }}></div>
-                        <span style={{ fontSize: '8pt', fontWeight: '900', color: '#1e293b', fontFamily: 'monospace' }}>{printer.connectionType === 'Network' ? (printer.ipAddress || 'AUTO IP') : 'USB'}</span>
+                {/* FOOTER (15mm) */}
+                <div style={{ position: 'absolute', bottom: 0, left: 0, width: '100%', height: '15mm', padding: '0 3mm' }}>
+                    <div style={{ position: 'absolute', bottom: '3mm', left: '3mm', display: 'flex', alignItems: 'center', gap: '1mm', backgroundColor: '#f1f5f9', border: '0.1mm solid #e2e8f0', borderRadius: '1.5mm', padding: '1.5mm 3mm' }}>
+                        <div style={{ width: '1.5mm', height: '1.5mm', borderRadius: '50%', backgroundColor: '#3b82f6' }}></div>
+                        <span style={{ fontSize: '7pt', fontWeight: '900', color: '#1e293b', fontFamily: 'monospace' }}>{printer.connectionType === 'Network' ? (printer.ipAddress?.split('.').pop() || 'IP') : 'USB'}</span>
                     </div>
-                    <div style={{ position: 'absolute', bottom: '4mm', right: '4mm', fontSize: '20pt', fontWeight: '950', color: '#10b981', fontFamily: 'monospace', letterSpacing: '-1mm' }}>#{printer.shortCode}</div>
+                    <div style={{ position: 'absolute', bottom: '2mm', right: '3mm', fontSize: '16pt', fontWeight: '950', color: '#10b981', fontFamily: 'monospace', letterSpacing: '-0.5mm' }}>#{printer.shortCode}</div>
                 </div>
               </div>
             ))}
@@ -201,3 +196,4 @@ export const QrManagement: React.FC = () => {
     </div>
   );
 };
+
