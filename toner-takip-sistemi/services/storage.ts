@@ -31,7 +31,7 @@ const INITIAL_CONFIG: SystemConfig = {
 const cleanData = (data: any) => {
   const newObj = { ...data };
   Object.keys(newObj).forEach(key => {
-    if (newObj[key] === undefined) delete newObj[key];
+    if (newObj[key] === undefined || newObj[key] === null) delete newObj[key];
   });
   return newObj;
 };
@@ -264,13 +264,18 @@ export const StorageService = {
 
   addCounterLog: async (log: CounterLog, updateMaster: boolean = true) => {
     const { id, ...data } = log;
+    // Log kaydını ekle
     await addDoc(collection(db, COLLECTIONS.COUNTERS), cleanData(data));
-    if (updateMaster) {
-      await updateDoc(doc(db, COLLECTIONS.PRINTERS, log.printerId), { 
+    
+    // Yazıcı ana verisini (Son Sayaç) güncelle
+    if (updateMaster && log.printerId) {
+      const updatePayload = {
         lastCounter: log.currentCounter,
         lastCounterBW: log.currentBW,
         lastCounterColor: log.currentColor
-      });
+      };
+      // undefined alanları temizle yoksa Firebase hata verir
+      await updateDoc(doc(db, COLLECTIONS.PRINTERS, log.printerId), cleanData(updatePayload));
     }
   },
 
