@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { ArrowDown, ArrowUp, CheckCircle, AlertTriangle, Search, Banknote, Calendar, Settings as SettingsIcon, MessageCircle, Printer as PrinterIcon } from 'lucide-react';
 import { TonerStock, Printer, StockLog, SystemConfig } from '../types';
@@ -126,7 +127,7 @@ export const StockManagement: React.FC<StockManagementProps> = ({ user }) => {
     if (selectedPrinterId && selectedPrinterId !== 'MANUAL') {
       const printer = printers.find(p => p.id === selectedPrinterId);
       if (printer) {
-         printerDesc = `${printer.location} (${printer.floor})`;
+         printerDesc = `${printer.location} (${printer.model}) [${printer.connectionType === 'Network' ? printer.ipAddress : 'USB'}]`;
          const isNewerDate = isoLogDate > printer.lastTonerDate;
          const updatedPrinter = {
             ...printer,
@@ -348,7 +349,7 @@ export const StockManagement: React.FC<StockManagementProps> = ({ user }) => {
                   <option value="">-- Yazıcı Seçiniz --</option>
                   {printers.map(p => (
                     <option key={p.id} value={p.id}>
-                      {p.location} ({p.model}) - {getPrinterStatusText(p.status)}
+                      {p.location} ({p.model}) [{(p.connectionType === 'Network' && p.ipAddress) ? p.ipAddress : 'USB'}] - {getPrinterStatusText(p.status)}
                     </option>
                   ))}
                   <option value="MANUAL">Listede Yok / Manuel Çıkış</option>
