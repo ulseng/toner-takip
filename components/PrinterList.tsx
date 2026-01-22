@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo, memo, useRef } from 'react';
-import { Plus, Search, MapPin, Printer as PrinterIcon, Edit2, X, Wifi, Usb, Trash2, QrCode, RefreshCw, Calendar, Calculator, Wrench, Droplet, Globe, TrendingUp, User as UserIcon, SortAsc, SortDesc, Filter, Layers, LayoutGrid, Type, Clock, ShieldCheck, Zap, StickyNote, Image as ImageIcon, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, Search, MapPin, Printer as PrinterIcon, Edit2, X, Wifi, Usb, Trash2, QrCode, RefreshCw, Calendar, Calculator, Wrench, Droplet, Globe, TrendingUp, User as UserIcon, SortAsc, SortDesc, Filter, Layers, LayoutGrid, Type, Clock, ShieldCheck, Zap, StickyNote, Image as ImageIcon, ChevronDown, ChevronUp, AlertTriangle, ShieldAlert } from 'lucide-react';
 import { Printer as PrinterType, SystemConfig, StockLog, ServiceRecord, CounterLog, Note } from '../types';
 import { StorageService } from '../services/storage';
 import { LoadingScreen } from './LoadingScreen';
@@ -16,8 +16,8 @@ const PrinterCard = memo(({ printer, onOpen, onEdit, onDelete, modelImage }: {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'ACTIVE': return 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]';
-      case 'MAINTENANCE': return 'bg-orange-500';
-      case 'BROKEN': return 'bg-red-500';
+      case 'MAINTENANCE': return 'bg-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.5)]';
+      case 'BROKEN': return 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]';
       default: return 'bg-zinc-500';
     }
   };
@@ -229,7 +229,6 @@ export const PrinterList: React.FC<PrinterListProps> = ({ targetPrinterId, clear
     else setShowDetailScrollTop(false);
   };
 
-  // Fixed ReferenceError: added quotes around 'smooth' to make it a string literal
   const scrollToDetailTop = () => {
     detailScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -238,7 +237,13 @@ export const PrinterList: React.FC<PrinterListProps> = ({ targetPrinterId, clear
   const filteredPrinters = useMemo(() => {
     const s = searchTerm.toLocaleLowerCase('tr-TR');
     return printers.filter(p => {
-      const matchSearch = (p.model.toLocaleLowerCase('tr-TR').includes(s) || p.location.toLocaleLowerCase('tr-TR').includes(s) || p.shortCode?.includes(s) || p.serialNumber.toLowerCase().includes(s));
+      const matchSearch = (
+        p.model.toLocaleLowerCase('tr-TR').includes(s) || 
+        p.location.toLocaleLowerCase('tr-TR').includes(s) || 
+        p.shortCode?.includes(s) || 
+        p.serialNumber.toLowerCase().includes(s) ||
+        (p.ipAddress && p.ipAddress.includes(s)) 
+      );
       const matchFloor = !selectedFloor || p.floor === selectedFloor;
       const matchModel = !selectedModel || p.model === selectedModel;
       return matchSearch && matchFloor && matchModel;
@@ -277,7 +282,7 @@ export const PrinterList: React.FC<PrinterListProps> = ({ targetPrinterId, clear
           <div className="absolute inset-y-0 left-6 flex items-center pointer-events-none text-zinc-700 group-focus-within:text-emerald-500 transition-colors"><Search size={24} /></div>
           <input 
             type="text" 
-            placeholder="Model, Lokasyon veya Hızlı Kod ara..." 
+            placeholder="Model, Lokasyon, IP veya Hızlı Kod ara..." 
             className="w-full pl-16 pr-8 py-6 rounded-[2rem] bg-zinc-900/20 backdrop-blur-md border border-white/5 text-white shadow-xl outline-none focus:border-emerald-500/30 transition-all font-bold text-lg placeholder:text-zinc-700" 
             value={searchTerm} 
             onChange={(e) => setSearchTerm(e.target.value)} 
@@ -346,7 +351,34 @@ export const PrinterList: React.FC<PrinterListProps> = ({ targetPrinterId, clear
                       <button onClick={() => window.history.back()} className="p-4 bg-zinc-900/80 backdrop-blur-xl text-white rounded-2xl hover:bg-red-600 transition-all shadow-2xl border border-white/5"><X size={24} strokeWidth={3}/></button>
                   </div>
 
-                  {/* BAŞLIK & QR PANELİ (ARTIK KAYABİLİR) */}
+                  {/* SERVİSTE KRİTİK UYARI PANELİ (EN ÜSTTE) */}
+                  {selectedPrinter.status === 'MAINTENANCE' && (
+                    <div className="mx-8 mt-2 mb-6 p-6 bg-amber-500/10 border-2 border-amber-500/40 rounded-[2.5rem] flex items-center gap-5 animate-pulse shadow-[0_0_40px_rgba(245,158,11,0.2)]">
+                        <div className="p-4 bg-amber-500 text-black rounded-2xl shadow-xl">
+                            <Wrench size={32} strokeWidth={2.5} />
+                        </div>
+                        <div className="flex-1">
+                            <p className="text-[11px] font-black text-amber-500 uppercase tracking-[0.4em] leading-none mb-1">DURUM: SERVİSTE</p>
+                            <p className="text-base font-black text-white uppercase tracking-tight leading-tight">BU CİHAZ ŞU ANDA TEKNİK SERVİS AŞAMASINDADIR.</p>
+                            <p className="text-[10px] text-zinc-500 font-bold mt-2 uppercase tracking-widest italic opacity-80">Geri dönüş yapılana kadar cihaz pasif durumdadır.</p>
+                        </div>
+                    </div>
+                  )}
+
+                  {/* ARIZALI UYARI PANELİ */}
+                  {selectedPrinter.status === 'BROKEN' && (
+                    <div className="mx-8 mt-2 mb-6 p-6 bg-red-600/10 border-2 border-red-600/30 rounded-[2.5rem] flex items-center gap-5 animate-pulse shadow-[0_0_40px_rgba(220,38,38,0.2)]">
+                        <div className="p-4 bg-red-600 text-white rounded-2xl shadow-xl">
+                            <ShieldAlert size={32} strokeWidth={2.5} />
+                        </div>
+                        <div className="flex-1">
+                            <p className="text-[11px] font-black text-red-500 uppercase tracking-[0.4em] leading-none mb-1">DURUM: ARIZALI</p>
+                            <p className="text-base font-black text-white uppercase tracking-tight leading-tight">CİHAZ ARIZALI OLARAK İŞARETLENMİŞTİR.</p>
+                        </div>
+                    </div>
+                  )}
+
+                  {/* BAŞLIK & QR PANELİ */}
                   <div className="px-8 pb-8 flex flex-col bg-zinc-950/50 border-b border-white/5 relative">
                       <div className="flex flex-col md:flex-row gap-6 items-start">
                           <div className="flex flex-col items-center gap-2 p-3 bg-white rounded-3xl shadow-xl border border-zinc-800 shrink-0 mx-auto md:mx-0">
@@ -426,7 +458,7 @@ export const PrinterList: React.FC<PrinterListProps> = ({ targetPrinterId, clear
                           ))}
                       </div>
 
-                      {/* ALT AKSİYONLAR (KAYDIRILABİLİR ALANIN SONUNDA) */}
+                      {/* ALT AKSİYONLAR */}
                       <div className="pt-10 grid grid-cols-2 gap-4 pb-20">
                           <button onClick={(e) => openFormModal(e, selectedPrinter)} className="py-6 bg-zinc-900 text-white rounded-[1.5rem] font-black uppercase text-[10px] tracking-[0.3em] active:scale-95 transition-all shadow-xl">DÜZENLE</button>
                           <button onClick={() => window.history.back()} className="py-6 bg-white text-black rounded-[1.5rem] font-black uppercase text-[10px] tracking-[0.3em] active:scale-95 transition-all shadow-xl">KAPAT</button>
@@ -434,7 +466,7 @@ export const PrinterList: React.FC<PrinterListProps> = ({ targetPrinterId, clear
                   </div>
               </div>
 
-              {/* YUKARI ÇIK BUTONU (Sadece Drawer Açıkken ve Aşağı Kaydırılmışken) */}
+              {/* YUKARI ÇIK BUTONU */}
               {showDetailScrollTop && (
                   <button 
                     onClick={scrollToDetailTop} 
@@ -493,6 +525,15 @@ export const PrinterList: React.FC<PrinterListProps> = ({ targetPrinterId, clear
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-2">KAT / BÖLÜM</label>
                 <input required type="text" className="w-full p-4 border border-white/10 rounded-2xl bg-zinc-900 text-white font-black outline-none focus:border-emerald-500" placeholder="Örn: 2. Kat, Zemin, Laboratuvar..." value={formData.floor} onChange={e => setFormData({...formData, floor: e.target.value})} />
+              </div>
+
+              <div className="space-y-3">
+                <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-2">CİHAZ DURUMU</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button type="button" onClick={() => setFormData({...formData, status: 'ACTIVE'})} className={`py-3 rounded-xl font-black text-[10px] uppercase transition-all ${formData.status === 'ACTIVE' ? 'bg-emerald-600 text-white shadow-lg' : 'bg-zinc-800 text-zinc-500'}`}>AKTİF</button>
+                  <button type="button" onClick={() => setFormData({...formData, status: 'MAINTENANCE'})} className={`py-3 rounded-xl font-black text-[10px] uppercase transition-all ${formData.status === 'MAINTENANCE' ? 'bg-amber-600 text-white shadow-lg' : 'bg-zinc-800 text-zinc-500'}`}>SERVİSTE</button>
+                  <button type="button" onClick={() => setFormData({...formData, status: 'BROKEN'})} className={`py-3 rounded-xl font-black text-[10px] uppercase transition-all ${formData.status === 'BROKEN' ? 'bg-red-600 text-white shadow-lg' : 'bg-zinc-800 text-zinc-500'}`}>ARIZALI</button>
+                </div>
               </div>
 
               <button type="submit" className="w-full py-6 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-black shadow-xl transition-all uppercase tracking-widest mt-4">SİSTEME KAYDET</button>
