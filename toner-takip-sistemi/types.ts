@@ -93,6 +93,8 @@ export interface ServiceRecord {
   provider: string;
   status: 'PENDING' | 'COMPLETED' | 'SCRAPPED';
   lastModifiedBy?: string;
+  createdAt?: string;
+  completedAt?: string;
 }
 
 export interface CounterLog {

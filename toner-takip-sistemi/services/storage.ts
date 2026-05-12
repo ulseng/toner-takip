@@ -19,7 +19,7 @@ const COLLECTIONS = {
 
 const INITIAL_CONFIG: SystemConfig = {
   brands: ['Canon', 'HP', 'Kyocera', 'Xerox', 'Epson'],
-  models: ['MF416dw', 'iF1643', 'LBP 251DW', '3325i', 'L3210', 'L1210', 'P2035', 'LBP 6030'],
+  models: ['MF416dw', 'iR1643', 'LBP 251DW', '3325i', 'L3210', 'L1210', 'P2035', 'LBP 6030'],
   suppliers: ['Anahtar Bilgisayar', 'Enes Bilişim', 'Kendi Malımız'],
   tonerModels: ['1643', '505', '259x'],
   whatsappNumber: '',
@@ -37,6 +37,97 @@ const cleanData = (data: any) => {
 };
 
 export const StorageService = {
+  // --- YEDEKLEME VE GERİ YÜKLEME ---
+  exportDatabase: async () => {
+    try {
+      const backup: Record<string, any[]> = {};
+      const fetchPromises = Object.entries(COLLECTIONS).map(async ([key, collectionName]) => {
+        const snapshot = await getDocs(collection(db, collectionName));
+        backup[collectionName] = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      });
+      
+      await Promise.all(fetchPromises);
+      return backup;
+    } catch (e) {
+      console.error("Yedekleme Hatası:", e);
+      throw e;
+    }
+  },
+
+  importDatabase: async (backupData: Record<string, any[]>) => {
+    try {
+      // Önemli: Firebase limitleri nedeniyle işlemleri 500'lük paketlere bölmeliyiz (Batch limit)
+      // Ancak basitlik ve veri bütünlüğü için burada koleksiyon bazlı ilerliyoruz.
+      
+      for (const [collectionName, docs] of Object.entries(backupData)) {
+          // 1. Mevcut koleksiyonu temizle
+          const currentSnap = await getDocs(collection(db, collectionName));
+          const deleteBatch = writeBatch(db);
+          currentSnap.docs.forEach(d => deleteBatch.delete(d.ref));
+          await deleteBatch.commit();
+
+          // 2. Yeni verileri yükle (500'erli paketler halinde)
+          for (let i = 0; i < docs.length; i += 500) {
+              const batch = writeBatch(db);
+              const chunk = docs.slice(i, i + 500);
+              chunk.forEach(docData => {
+                  const { id, ...data } = docData;
+                  const docRef = id ? doc(db, collectionName, id) : doc(collection(db, collectionName));
+                  batch.set(docRef, cleanData(data));
+              });
+              await batch.commit();
+          }
+      }
+      return true;
+    } catch (e) {
+      console.error("Geri Yükleme Hatası:", e);
+      throw e;
+    }
+  },
+
+  // --- KRİTİK: MATEMATİKSEL STOK ONARIM MOTORU ---
+  syncTonerModelsFromExistingData: async () => {
+    try {
+      const [logsSnap, stocksSnap, configDoc] = await Promise.all([
+        getDocs(collection(db, COLLECTIONS.LOGS)),
+        getDocs(collection(db, COLLECTIONS.STOCKS)),
+        getDoc(doc(db, COLLECTIONS.CONFIG, 'main_config'))
+      ]);
+
+      const allLogs = logsSnap.docs.map(d => ({ id: d.id, ...d.data() } as StockLog));
+      const config = configDoc.exists() ? (configDoc.data() as SystemConfig) : INITIAL_CONFIG;
+      const stockMap = new Map<string, number>();
+      
+      allLogs.forEach(log => {
+          const model = (log.tonerModel || "").trim().toUpperCase();
+          if (!model) return;
+          const current = stockMap.get(model) || 0;
+          const qty = Number(log.quantity) || 0;
+          if (log.type === 'IN') stockMap.set(model, current + qty);
+          else if (log.type === 'OUT') stockMap.set(model, current - qty);
+      });
+
+      const batch = writeBatch(db);
+      stocksSnap.docs.forEach(d => batch.delete(d.ref));
+
+      const finalModels: string[] = [];
+      stockMap.forEach((quantity, modelName) => {
+          const newStockRef = doc(collection(db, COLLECTIONS.STOCKS));
+          const finalQty = quantity < 0 ? 0 : quantity;
+          batch.set(newStockRef, { modelName, quantity: finalQty });
+          finalModels.push(modelName);
+      });
+
+      const uniqueTonerModels = Array.from(new Set([...(config.tonerModels || []), ...finalModels])).filter(Boolean).sort();
+      batch.set(doc(db, COLLECTIONS.CONFIG, 'main_config'), { ...config, tonerModels: uniqueTonerModels }, { merge: true });
+      await batch.commit();
+      
+      return { recalculatedCount: stockMap.size, totalModelsInConfig: uniqueTonerModels.length, models: Array.from(stockMap.keys()) };
+    } catch (e: any) {
+      throw new Error(e.message || "Bilinmeyen bir hata oluştu.");
+    }
+  },
+
   // --- INVOICES ---
   getInvoices: async (): Promise<InvoiceRecord[]> => {
     try {
@@ -242,6 +333,13 @@ export const StorageService = {
   addServiceRecord: async (record: ServiceRecord, user: string) => {
     const { id, ...data } = record;
     const docRef = await addDoc(collection(db, COLLECTIONS.SERVICES), cleanData(data));
+    await StorageService.addActivity({
+      id: '',
+      date: new Date().toISOString(),
+      user: user,
+      action: 'SERVIS_EKLENDI',
+      details: `"${record.printerName}" cihazı için yeni servis kaydı oluşturuldu: ${record.issue}`
+    });
     return docRef.id;
   },
 
@@ -249,10 +347,36 @@ export const StorageService = {
     if (!record.id) return;
     const { id, ...data } = record;
     await updateDoc(doc(db, COLLECTIONS.SERVICES, id), cleanData({ ...data, lastModifiedBy: user }));
+    
+    let action = 'SERVIS_GUNCELLEME';
+    let details = `"${record.printerName}" cihazına ait servis kaydı güncellendi.`;
+    
+    if (record.status === 'COMPLETED') {
+      action = 'SERVIS_TAMAMLANDI';
+      details = `"${record.printerName}" cihazına ait servis kaydı tamamlandı. Yapılan İşlem: ${record.actionTaken || 'Belirtilmedi'}. Maliyet: ${record.cost.toLocaleString()} ₺`;
+    } else if (record.status === 'SCRAPPED') {
+      action = 'SERVIS_HURDA';
+      details = `"${record.printerName}" cihazı servis sonrası hurdaya ayrıldı. Yapılan İşlem: ${record.actionTaken || 'Belirtilmedi'}. Maliyet: ${record.cost.toLocaleString()} ₺`;
+    }
+
+    await StorageService.addActivity({
+      id: '',
+      date: new Date().toISOString(),
+      user: user,
+      action: action,
+      details: details
+    });
   },
 
   deleteServiceRecord: async (id: string, user: string, printerName: string) => {
     await deleteDoc(doc(db, COLLECTIONS.SERVICES, id));
+    await StorageService.addActivity({
+      id: '',
+      date: new Date().toISOString(),
+      user: user,
+      action: 'SERVIS_SILINDI',
+      details: `"${printerName}" cihazına ait servis kaydı silindi.`
+    });
   },
 
   // --- COUNTERS ---
@@ -264,28 +388,18 @@ export const StorageService = {
 
   addCounterLog: async (log: CounterLog, updateMaster: boolean = true) => {
     const { id, ...data } = log;
-    // Log kaydını ekle
     await addDoc(collection(db, COLLECTIONS.COUNTERS), cleanData(data));
-    
-    // Yazıcı ana verisini (Son Sayaç) güncelle
     if (updateMaster && log.printerId) {
-      const updatePayload = {
-        lastCounter: log.currentCounter,
-        lastCounterBW: log.currentBW,
-        lastCounterColor: log.currentColor
-      };
-      // undefined alanları temizle yoksa Firebase hata verir
+      const updatePayload = { lastCounter: log.currentCounter, lastCounterBW: log.currentBW, lastCounterColor: log.currentColor };
       await updateDoc(doc(db, COLLECTIONS.PRINTERS, log.printerId), cleanData(updatePayload));
     }
   },
 
-  // Implementation for simulation fetching counter data
   fetchPrinterCounterSimulated: async (printer: Printer) => {
     await new Promise(resolve => setTimeout(resolve, 800));
     const base = printer.lastCounter || 0;
     const increment = Math.floor(Math.random() * 500) + 50;
     const total = base + increment;
-    
     if (printer.isColor) {
       const bwBase = printer.lastCounterBW || Math.floor(base * 0.7);
       const colorBase = printer.lastCounterColor || Math.floor(base * 0.3);
@@ -293,7 +407,6 @@ export const StorageService = {
       const colorInc = increment - bwInc;
       return { total, bw: bwBase + bwInc, color: colorBase + colorInc };
     }
-    
     return { total, bw: total, color: 0 };
   },
 
