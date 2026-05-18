@@ -25,10 +25,10 @@ const PrinterCard = memo(({ printer, onOpen, onEdit, onDelete, modelImage }: {
   return (
     <div 
       onClick={() => onOpen(printer)} 
-      className="group rounded-[2.5rem] bg-[#121214] border border-white/5 transition-all duration-300 hover:border-emerald-500/20 active:scale-[0.98] cursor-pointer shadow-xl flex flex-col overflow-hidden"
+      className="group rounded-[2.5rem] bg-white dark:bg-zinc-900/60 border border-zinc-100 dark:border-white/5 transition-all duration-300 hover:border-emerald-500/20 active:scale-[0.98] cursor-pointer shadow-xl flex flex-col overflow-hidden"
     >
       {/* Cihaz Fotoğraf Alanı */}
-      <div className="relative h-44 bg-zinc-900 flex items-center justify-center overflow-hidden border-b border-white/5">
+      <div className="relative h-44 bg-zinc-50 dark:bg-zinc-900 flex items-center justify-center overflow-hidden border-b border-zinc-100 dark:border-white/5">
         {modelImage ? (
           <img 
             src={modelImage} 
@@ -37,9 +37,9 @@ const PrinterCard = memo(({ printer, onOpen, onEdit, onDelete, modelImage }: {
             className="w-full h-full object-contain p-6 transform group-hover:scale-105 transition-transform duration-500"
           />
         ) : (
-          <div className="flex flex-col items-center gap-2 text-zinc-800">
+          <div className="flex flex-col items-center gap-2 text-zinc-300 dark:text-zinc-800">
              <PrinterIcon size={40} strokeWidth={1.5} />
-             <span className="text-[8px] font-black uppercase tracking-widest opacity-20">Fotoğraf Yok</span>
+             <span className="text-[8px] font-black uppercase tracking-widest opacity-20 dark:opacity-20 opacity-50">Fotoğraf Yok</span>
           </div>
         )}
         <div className={`absolute top-4 right-4 w-2.5 h-2.5 rounded-full ${getStatusBadge(printer.status)} border-2 border-zinc-900 z-10`}></div>
@@ -55,38 +55,39 @@ const PrinterCard = memo(({ printer, onOpen, onEdit, onDelete, modelImage }: {
                <MapPin size={16} strokeWidth={2.5}/>
             </div>
             <div className="flex flex-col min-w-0">
-               <span className="text-base font-black text-white uppercase tracking-tight leading-tight truncate">
+               <span className="text-base font-black text-zinc-900 dark:text-white uppercase tracking-tight leading-tight truncate">
                  {printer.location}
                </span>
-               <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest truncate">
+               <span className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest truncate">
                  {printer.floor || 'Bilinmeyen Kat'}
                </span>
             </div>
           </div>
           
-          <h3 className="text-lg font-black text-zinc-400 leading-none tracking-tighter uppercase mb-4 group-hover:text-white transition-colors">
+          <h3 className="text-lg font-black text-zinc-500 dark:text-zinc-400 leading-none tracking-tighter uppercase mb-4 group-hover:text-emerald-600 dark:group-hover:text-white transition-colors">
             {printer.brand} {printer.model}
           </h3>
           
           <div className="flex flex-wrap gap-2 mb-6">
               {printer.connectionType === 'Network' ? (
-                  <span className="bg-blue-500/10 text-blue-400 px-3 py-1 rounded-lg text-[9px] font-black uppercase border border-blue-500/20 flex items-center gap-1"><Wifi size={12}/> {printer.ipAddress}</span>
+                  <span className="bg-blue-500/10 text-blue-600 dark:text-blue-400 px-3 py-1 rounded-lg text-[9px] font-black uppercase border border-blue-500/20 flex items-center gap-1"><Wifi size={12}/> {printer.ipAddress}</span>
               ) : (
-                  <span className="bg-zinc-800 text-zinc-500 px-3 py-1 rounded-lg text-[9px] font-black uppercase border border-white/5 flex items-center gap-1"><Usb size={12}/> USB BAĞLANTI</span>
+                  <span className="bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-500 px-3 py-1 rounded-lg text-[9px] font-black uppercase border border-zinc-200 dark:border-white/5 flex items-center gap-1"><Usb size={12}/> USB BAĞLANTI</span>
               )}
+              <span className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-3 py-1 rounded-lg text-[9px] font-black uppercase border border-emerald-500/20 flex items-center gap-1"><ShieldCheck size={12}/> S/N: {printer.serialNumber}</span>
               {printer.compatibleToner && (
-                  <span className="bg-orange-500/10 text-orange-500 px-3 py-1 rounded-lg text-[9px] font-black uppercase border border-orange-500/20 flex items-center gap-1"><Droplet size={12}/> {printer.compatibleToner}</span>
+                  <span className="bg-orange-500/10 text-orange-600 dark:text-orange-500 px-3 py-1 rounded-lg text-[9px] font-black uppercase border border-orange-500/20 flex items-center gap-1"><Droplet size={12}/> {printer.compatibleToner}</span>
               )}
           </div>
 
-          <div className="pt-5 border-t border-white/5 flex justify-between items-center">
+          <div className="pt-5 border-t border-zinc-100 dark:border-white/5 flex justify-between items-center">
               <div className="space-y-0.5">
-                  <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest">SAYAÇ</p>
-                  <p className="text-2xl font-mono font-black text-white leading-none">{printer.lastCounter.toLocaleString('tr-TR')}</p>
+                  <p className="text-[9px] font-black text-zinc-400 dark:text-zinc-600 uppercase tracking-widest">SAYAÇ</p>
+                  <p className="text-2xl font-mono font-black text-zinc-900 dark:text-white leading-none">{printer.lastCounter.toLocaleString('tr-TR')}</p>
               </div>
               <div className="flex gap-2">
-                 <button onClick={(e) => onEdit(e, printer)} className="p-2.5 bg-zinc-900 text-zinc-500 hover:text-emerald-500 hover:bg-emerald-500/10 rounded-xl transition-all border border-white/5"><Edit2 size={14}/></button>
-                 <button onClick={(e) => onDelete(e, printer)} className="p-2.5 bg-zinc-900 text-zinc-500 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all border border-white/5"><Trash2 size={14}/></button>
+                 <button onClick={(e) => onEdit(e, printer)} className="p-2.5 bg-zinc-50 dark:bg-zinc-900 text-zinc-400 dark:text-zinc-500 hover:text-emerald-600 dark:hover:text-emerald-500 hover:bg-emerald-500/10 rounded-xl transition-all border border-zinc-100 dark:border-white/5"><Edit2 size={14}/></button>
+                 <button onClick={(e) => onDelete(e, printer)} className="p-2.5 bg-zinc-50 dark:bg-zinc-900 text-zinc-400 dark:text-zinc-500 hover:text-red-600 dark:hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all border border-zinc-100 dark:border-white/5"><Trash2 size={14}/></button>
               </div>
           </div>
       </div>

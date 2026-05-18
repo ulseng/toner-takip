@@ -36,7 +36,13 @@ function App() {
     
     // 2. Temayı Yükle
     const savedTheme = localStorage.getItem('app_theme');
-    if (savedTheme === 'dark') setIsDarkMode(true);
+    if (savedTheme === 'dark') {
+      setIsDarkMode(true);
+      document.documentElement.classList.add('dark');
+    } else {
+      setIsDarkMode(false);
+      document.documentElement.classList.remove('dark');
+    }
 
     // 3. QR/URL Parametrelerini Çöz
     const resolveUrlParams = async () => {
@@ -93,45 +99,43 @@ function App() {
     const newMode = !isDarkMode;
     setIsDarkMode(newMode);
     localStorage.setItem('app_theme', newMode ? 'dark' : 'light');
+    if (newMode) document.documentElement.classList.add('dark');
+    else document.documentElement.classList.remove('dark');
   };
 
   if (!user) {
     return (
-      <div className={isDarkMode ? 'dark' : ''}>
-        <Login onLogin={handleLogin} isDarkMode={isDarkMode} toggleTheme={toggleTheme} />
-      </div>
+      <Login onLogin={handleLogin} isDarkMode={isDarkMode} toggleTheme={toggleTheme} />
     );
   }
 
   return (
-    <div className={isDarkMode ? 'dark' : ''}>
-      <Layout 
-        activeTab={activeTab} 
-        setActiveTab={setActiveTab} 
-        onLogout={handleLogout} 
-        user={user as any} // Desktop/Mobil farketmeksizin aynı logout tetiklenir
-        isDarkMode={isDarkMode}
-        toggleTheme={toggleTheme}
-      >
-        {activeTab === 'dashboard' && <Dashboard setActiveTab={setActiveTab} />}
-        {activeTab === 'invoices' && <Invoices />}
-        {activeTab === 'scan' && <QrScanner />}
-        {activeTab === 'qr' && <QrManagement />}
-        {activeTab === 'notes' && <Notes user={user} />}
-        {activeTab === 'printers' && (
-            <PrinterList 
-                targetPrinterId={targetPrinterId} 
-                clearTarget={() => setTargetPrinterId(null)} 
-            />
-        )}
-        {activeTab === 'inventory' && <Inventory />} 
-        {activeTab === 'counters' && <CounterManagement user={user} />}
-        {activeTab === 'service' && <ServiceManagement user={user} />}
-        {activeTab === 'stock' && <StockManagement user={user} />}
-        {activeTab === 'history' && <History />}
-        {activeTab === 'settings' && <Settings />}
-      </Layout>
-    </div>
+    <Layout 
+      activeTab={activeTab} 
+      setActiveTab={setActiveTab} 
+      onLogout={handleLogout} 
+      user={user as any} // Desktop/Mobil farketmeksizin aynı logout tetiklenir
+      isDarkMode={isDarkMode}
+      toggleTheme={toggleTheme}
+    >
+      {activeTab === 'dashboard' && <Dashboard setActiveTab={setActiveTab} />}
+      {activeTab === 'invoices' && <Invoices />}
+      {activeTab === 'scan' && <QrScanner />}
+      {activeTab === 'qr' && <QrManagement />}
+      {activeTab === 'notes' && <Notes user={user} />}
+      {activeTab === 'printers' && (
+          <PrinterList 
+              targetPrinterId={targetPrinterId} 
+              clearTarget={() => setTargetPrinterId(null)} 
+          />
+      )}
+      {activeTab === 'inventory' && <Inventory />} 
+      {activeTab === 'counters' && <CounterManagement user={user} />}
+      {activeTab === 'service' && <ServiceManagement user={user} />}
+      {activeTab === 'stock' && <StockManagement user={user} />}
+      {activeTab === 'history' && <History />}
+      {activeTab === 'settings' && <Settings />}
+    </Layout>
   );
 }
 
