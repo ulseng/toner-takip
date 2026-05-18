@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo, memo, useRef } from 'react';
-import { Plus, Search, MapPin, Printer as PrinterIcon, Edit2, X, Wifi, Usb, Trash2, QrCode, RefreshCw, Calendar, Calculator, Wrench, Droplet, Globe, TrendingUp, User as UserIcon, SortAsc, SortDesc, Filter, Layers, LayoutGrid, Type, Clock, ShieldCheck, Zap, StickyNote, Image as ImageIcon, ChevronDown, ChevronUp, AlertTriangle, ShieldAlert } from 'lucide-react';
+import { Plus, Search, MapPin, Printer as PrinterIcon, Edit2, X, Wifi, Usb, Trash2, QrCode, RefreshCw, Calendar, Calculator, Wrench, Droplet, Globe, TrendingUp, User as UserIcon, SortAsc, SortDesc, Filter, Layers, LayoutGrid, Type, Clock, ShieldCheck, Zap, StickyNote, Image as ImageIcon, ChevronDown, ChevronUp, AlertTriangle, ShieldAlert, CheckCircle2 } from 'lucide-react';
 import { Printer as PrinterType, SystemConfig, StockLog, ServiceRecord, CounterLog, Note } from '../types';
 import { StorageService } from '../services/storage';
 import { LoadingScreen } from './LoadingScreen';
@@ -25,10 +25,10 @@ const PrinterCard = memo(({ printer, onOpen, onEdit, onDelete, modelImage }: {
   return (
     <div 
       onClick={() => onOpen(printer)} 
-      className="group rounded-[2.5rem] bg-[#121214] border border-white/5 transition-all duration-300 hover:border-emerald-500/20 active:scale-[0.98] cursor-pointer shadow-xl flex flex-col overflow-hidden"
+      className="group rounded-[2.5rem] bg-white dark:bg-zinc-900/60 border border-zinc-100 dark:border-white/5 transition-all duration-300 hover:border-emerald-500/20 active:scale-[0.98] cursor-pointer shadow-xl flex flex-col overflow-hidden"
     >
       {/* Cihaz Fotoğraf Alanı */}
-      <div className="relative h-44 bg-zinc-900 flex items-center justify-center overflow-hidden border-b border-white/5">
+      <div className="relative h-44 bg-zinc-50 dark:bg-zinc-900 flex items-center justify-center overflow-hidden border-b border-zinc-100 dark:border-white/5">
         {modelImage ? (
           <img 
             src={modelImage} 
@@ -37,9 +37,9 @@ const PrinterCard = memo(({ printer, onOpen, onEdit, onDelete, modelImage }: {
             className="w-full h-full object-contain p-6 transform group-hover:scale-105 transition-transform duration-500"
           />
         ) : (
-          <div className="flex flex-col items-center gap-2 text-zinc-800">
+          <div className="flex flex-col items-center gap-2 text-zinc-300 dark:text-zinc-800">
              <PrinterIcon size={40} strokeWidth={1.5} />
-             <span className="text-[8px] font-black uppercase tracking-widest opacity-20">Fotoğraf Yok</span>
+             <span className="text-[8px] font-black uppercase tracking-widest opacity-20 dark:opacity-20 opacity-50">Fotoğraf Yok</span>
           </div>
         )}
         <div className={`absolute top-4 right-4 w-2.5 h-2.5 rounded-full ${getStatusBadge(printer.status)} border-2 border-zinc-900 z-10`}></div>
@@ -55,38 +55,39 @@ const PrinterCard = memo(({ printer, onOpen, onEdit, onDelete, modelImage }: {
                <MapPin size={16} strokeWidth={2.5}/>
             </div>
             <div className="flex flex-col min-w-0">
-               <span className="text-base font-black text-white uppercase tracking-tight leading-tight truncate">
+               <span className="text-base font-black text-zinc-900 dark:text-white uppercase tracking-tight leading-tight truncate">
                  {printer.location}
                </span>
-               <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest truncate">
+               <span className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest truncate">
                  {printer.floor || 'Bilinmeyen Kat'}
                </span>
             </div>
           </div>
           
-          <h3 className="text-lg font-black text-zinc-400 leading-none tracking-tighter uppercase mb-4 group-hover:text-white transition-colors">
+          <h3 className="text-lg font-black text-zinc-500 dark:text-zinc-400 leading-none tracking-tighter uppercase mb-4 group-hover:text-emerald-600 dark:group-hover:text-white transition-colors">
             {printer.brand} {printer.model}
           </h3>
           
           <div className="flex flex-wrap gap-2 mb-6">
               {printer.connectionType === 'Network' ? (
-                  <span className="bg-blue-500/10 text-blue-400 px-3 py-1 rounded-lg text-[9px] font-black uppercase border border-blue-500/20 flex items-center gap-1"><Wifi size={12}/> {printer.ipAddress}</span>
+                  <span className="bg-blue-500/10 text-blue-600 dark:text-blue-400 px-3 py-1 rounded-lg text-[9px] font-black uppercase border border-blue-500/20 flex items-center gap-1"><Wifi size={12}/> {printer.ipAddress}</span>
               ) : (
-                  <span className="bg-zinc-800 text-zinc-500 px-3 py-1 rounded-lg text-[9px] font-black uppercase border border-white/5 flex items-center gap-1"><Usb size={12}/> USB BAĞLANTI</span>
+                  <span className="bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-500 px-3 py-1 rounded-lg text-[9px] font-black uppercase border border-zinc-200 dark:border-white/5 flex items-center gap-1"><Usb size={12}/> USB BAĞLANTI</span>
               )}
+              <span className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-3 py-1 rounded-lg text-[9px] font-black uppercase border border-emerald-500/20 flex items-center gap-1"><ShieldCheck size={12}/> S/N: {printer.serialNumber}</span>
               {printer.compatibleToner && (
-                  <span className="bg-orange-500/10 text-orange-500 px-3 py-1 rounded-lg text-[9px] font-black uppercase border border-orange-500/20 flex items-center gap-1"><Droplet size={12}/> {printer.compatibleToner}</span>
+                  <span className="bg-orange-500/10 text-orange-600 dark:text-orange-500 px-3 py-1 rounded-lg text-[9px] font-black uppercase border border-orange-500/20 flex items-center gap-1"><Droplet size={12}/> {printer.compatibleToner}</span>
               )}
           </div>
 
-          <div className="pt-5 border-t border-white/5 flex justify-between items-center">
+          <div className="pt-5 border-t border-zinc-100 dark:border-white/5 flex justify-between items-center">
               <div className="space-y-0.5">
-                  <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest">SAYAÇ</p>
-                  <p className="text-2xl font-mono font-black text-white leading-none">{printer.lastCounter.toLocaleString('tr-TR')}</p>
+                  <p className="text-[9px] font-black text-zinc-400 dark:text-zinc-600 uppercase tracking-widest">SAYAÇ</p>
+                  <p className="text-2xl font-mono font-black text-zinc-900 dark:text-white leading-none">{printer.lastCounter.toLocaleString('tr-TR')}</p>
               </div>
               <div className="flex gap-2">
-                 <button onClick={(e) => onEdit(e, printer)} className="p-2.5 bg-zinc-900 text-zinc-500 hover:text-emerald-500 hover:bg-emerald-500/10 rounded-xl transition-all border border-white/5"><Edit2 size={14}/></button>
-                 <button onClick={(e) => onDelete(e, printer)} className="p-2.5 bg-zinc-900 text-zinc-500 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all border border-white/5"><Trash2 size={14}/></button>
+                 <button onClick={(e) => onEdit(e, printer)} className="p-2.5 bg-zinc-50 dark:bg-zinc-900 text-zinc-400 dark:text-zinc-500 hover:text-emerald-600 dark:hover:text-emerald-500 hover:bg-emerald-500/10 rounded-xl transition-all border border-zinc-100 dark:border-white/5"><Edit2 size={14}/></button>
+                 <button onClick={(e) => onDelete(e, printer)} className="p-2.5 bg-zinc-50 dark:bg-zinc-900 text-zinc-400 dark:text-zinc-500 hover:text-red-600 dark:hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all border border-zinc-100 dark:border-white/5"><Trash2 size={14}/></button>
               </div>
           </div>
       </div>
@@ -118,6 +119,25 @@ export const PrinterList: React.FC<PrinterListProps> = ({ targetPrinterId, clear
   const [printerCounters, setPrinterCounters] = useState<CounterLog[]>([]);
   const [printerTonerLogs, setPrinterTonerLogs] = useState<StockLog[]>([]);
   const [printerNotes, setPrinterNotes] = useState<Note[]>([]);
+
+  const calculateDuration = (start: string, end: string) => {
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+    const diffMs = endDate.getTime() - startDate.getTime();
+    
+    if (diffMs < 0) return "0 dk";
+    
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    const diffHours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    
+    let result = "";
+    if (diffDays > 0) result += `${diffDays} g `;
+    if (diffHours > 0) result += `${diffHours} sa `;
+    if (diffMinutes > 0 || result === "") result += `${diffMinutes} dk`;
+    
+    return result.trim();
+  };
 
   // Detay Drawer Scroll Kontrolü
   const detailScrollRef = useRef<HTMLDivElement>(null);
@@ -446,16 +466,62 @@ export const PrinterList: React.FC<PrinterListProps> = ({ targetPrinterId, clear
                       <div className="space-y-6">
                           <h4 className="flex items-center gap-3 text-white font-black text-lg uppercase tracking-tighter"><Wrench size={24} className="text-emerald-500"/> SERVİS GEÇMİŞİ</h4>
                           {printerServices.map(s => (
-                              <div key={s.id} className="bg-zinc-900/40 p-6 rounded-[2rem] border border-white/5 relative group/row overflow-hidden shadow-xl">
+                              <div key={s.id} className="bg-zinc-900/40 p-6 rounded-[2.5rem] border border-white/5 relative group/row overflow-hidden shadow-xl">
                                   <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-emerald-500"></div>
                                   <div className="flex justify-between items-start mb-3">
-                                      <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">{new Date(s.date).toLocaleDateString()}</span>
+                                      <div className="flex flex-col gap-1">
+                                          <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest flex items-center gap-1.5">
+                                              <Plus size={10} /> KAYIT: {new Date(s.createdAt || s.date).toLocaleDateString('tr-TR')} {new Date(s.createdAt || s.date).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+                                          </span>
+                                          {s.completedAt ? (
+                                              <span className="text-[9px] font-black text-emerald-500 uppercase tracking-widest flex items-center gap-1.5">
+                                                  <CheckCircle2 size={10} /> TESLİM: {new Date(s.completedAt).toLocaleDateString('tr-TR')} {new Date(s.completedAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+                                              </span>
+                                          ) : s.status === 'COMPLETED' ? (
+                                              <span className="text-[9px] font-black text-emerald-500 uppercase tracking-widest flex items-center gap-1.5">
+                                                  <CheckCircle2 size={10} /> TESLİM: (Tarih Belirtilmemiş)
+                                              </span>
+                                          ) : null}
+                                      </div>
                                       <span className="text-lg font-black text-white">{s.cost.toLocaleString()} ₺</span>
                                   </div>
-                                  <h5 className="text-base font-black text-white uppercase mb-1">{s.issue}</h5>
-                                  <p className="text-xs text-zinc-500 font-medium">{s.actionTaken}</p>
+                                  
+                                  <div className="mb-4">
+                                      <h5 className="text-base font-black text-white uppercase mb-1 tracking-tight">{s.issue}</h5>
+                                      <div className="flex items-center gap-2">
+                                          <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest ${
+                                              s.status === 'COMPLETED' ? 'bg-emerald-500/10 text-emerald-500' : 
+                                              s.status === 'PENDING' ? 'bg-orange-500/10 text-orange-500' : 
+                                              'bg-red-500/10 text-red-500'
+                                          }`}>
+                                              {s.status === 'COMPLETED' ? 'TAMAMLANDI' : s.status === 'PENDING' ? 'BEKLİYOR' : 'HURDA'}
+                                          </span>
+                                          {s.status === 'COMPLETED' && (s.createdAt || s.date) && s.completedAt && (
+                                              <span className="text-[8px] font-black text-zinc-500 uppercase tracking-widest flex items-center gap-1">
+                                                  <Clock size={10} /> {calculateDuration(s.createdAt || s.date, s.completedAt)} SÜRDÜ
+                                              </span>
+                                          )}
+                                      </div>
+                                  </div>
+
+                                  <div className="p-4 bg-zinc-950/50 rounded-2xl border border-white/5">
+                                      <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest mb-1">YAPILAN İŞLEM</p>
+                                      <p className="text-xs text-zinc-300 font-medium leading-relaxed">{s.actionTaken || 'İşlem bilgisi girilmemiş.'}</p>
+                                  </div>
+                                  
+                                  {s.note && (
+                                      <div className="mt-3 px-4">
+                                          <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-1">NOT</p>
+                                          <p className="text-[10px] text-zinc-500 italic">{s.note}</p>
+                                      </div>
+                                  )}
                               </div>
                           ))}
+                          {printerServices.length === 0 && (
+                              <div className="py-8 bg-zinc-900/20 border border-dashed border-zinc-800 rounded-[2rem] text-center">
+                                  <p className="text-zinc-700 font-black uppercase text-[10px]">Henüz servis kaydı bulunmuyor.</p>
+                              </div>
+                          )}
                       </div>
 
                       {/* ALT AKSİYONLAR */}

@@ -28,6 +28,9 @@ export const ServiceManagement: React.FC<ServiceManagementProps> = ({ user }) =>
     cost: 0,
     status: 'PENDING' as 'PENDING' | 'COMPLETED' | 'SCRAPPED',
     date: new Date().toISOString().split('T')[0],
+    startTime: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
+    completedDate: new Date().toISOString().split('T')[0],
+    completedTime: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
     imageUrl: ''
   });
 
@@ -44,6 +47,25 @@ export const ServiceManagement: React.FC<ServiceManagementProps> = ({ user }) =>
     setRecords(r);
     setPrinters(p);
     setLoading(false);
+  };
+
+  const calculateDuration = (start: string, end: string) => {
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+    const diffMs = endDate.getTime() - startDate.getTime();
+    
+    if (diffMs < 0) return "0 dk";
+    
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    const diffHours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    
+    let result = "";
+    if (diffDays > 0) result += `${diffDays} g `;
+    if (diffHours > 0) result += `${diffHours} sa `;
+    if (diffMinutes > 0 || result === "") result += `${diffMinutes} dk`;
+    
+    return result.trim();
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -68,6 +90,9 @@ export const ServiceManagement: React.FC<ServiceManagementProps> = ({ user }) =>
       cost: 0,
       status: 'PENDING',
       date: new Date().toISOString().split('T')[0],
+      startTime: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
+      completedDate: new Date().toISOString().split('T')[0],
+      completedTime: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
       imageUrl: ''
     });
     setIsModalOpen(true);
@@ -84,6 +109,9 @@ export const ServiceManagement: React.FC<ServiceManagementProps> = ({ user }) =>
       cost: record.cost,
       status: record.status,
       date: new Date(record.date).toISOString().split('T')[0],
+      startTime: record.createdAt ? new Date(record.createdAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : new Date(record.date).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
+      completedDate: record.completedAt ? new Date(record.completedAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+      completedTime: record.completedAt ? new Date(record.completedAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
       imageUrl: record.imageUrl || ''
     });
     setIsModalOpen(true);
@@ -108,22 +136,34 @@ export const ServiceManagement: React.FC<ServiceManagementProps> = ({ user }) =>
 
     setSaving(true);
     try {
-      const now = new Date();
-      const serviceDate = new Date(formData.date);
-      serviceDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
+      // Start Date calculation
+      const startDate = new Date(formData.date);
+      const [startHours, startMinutes] = formData.startTime.split(':').map(Number);
+      startDate.setHours(startHours || 0, startMinutes || 0, 0);
+
+      // Completion Date calculation (manual or automatic)
+      let completedAt: string | undefined = undefined;
+      if (formData.status === 'COMPLETED' || formData.status === 'SCRAPPED') {
+        const compDate = new Date(formData.completedDate);
+        const [hours, minutes] = formData.completedTime.split(':').map(Number);
+        compDate.setHours(hours || 0, minutes || 0, 0);
+        completedAt = compDate.toISOString();
+      }
 
       const record: ServiceRecord = {
         id: editingRecord?.id || '',
         printerId: printer.id,
         printerName: `${printer.brand} ${printer.model} (${printer.location})`,
-        date: serviceDate.toISOString(),
+        date: startDate.toISOString(),
         issue: formData.issue,
         actionTaken: formData.actionTaken,
         note: formData.note,
         provider: formData.provider,
         cost: formData.cost,
         status: formData.status,
-        imageUrl: formData.imageUrl || undefined
+        imageUrl: formData.imageUrl || undefined,
+        createdAt: startDate.toISOString(),
+        completedAt: completedAt
       };
 
       if (editingRecord) {
@@ -199,8 +239,13 @@ export const ServiceManagement: React.FC<ServiceManagementProps> = ({ user }) =>
                           {record.status === 'COMPLETED' ? 'TAMAMLANDI' : record.status === 'PENDING' ? 'SERVİS BEKLİYOR' : 'HURDA / DEĞİŞİM'}
                         </span>
                         <span className="text-zinc-400 text-xs font-black flex items-center gap-2 uppercase tracking-widest">
-                          <Calendar size={14} /> {new Date(record.date).toLocaleDateString('tr-TR')}
+                          <Calendar size={14} /> {new Date(record.date).toLocaleDateString('tr-TR')} {new Date(record.date).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
                         </span>
+                        {record.status === 'COMPLETED' && record.createdAt && record.completedAt && (
+                          <span className="bg-emerald-500/10 text-emerald-500 px-3 py-1 rounded-lg text-[10px] font-black flex items-center gap-2 border border-emerald-500/20">
+                            <Clock size={12} /> {calculateDuration(record.createdAt, record.completedAt)} SÜRDÜ
+                          </span>
+                        )}
                       </div>
                       <h4 className="text-2xl font-black text-zinc-900 dark:text-white uppercase leading-tight tracking-tighter mt-3">{record.printerName}</h4>
                     </div>
@@ -221,6 +266,18 @@ export const ServiceManagement: React.FC<ServiceManagementProps> = ({ user }) =>
                            <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">YAPILAN MÜDAHALE</p>
                            <p className="text-sm text-zinc-500 dark:text-zinc-400 font-medium">{record.actionTaken}</p>
                         </div>
+                        {record.createdAt && (
+                          <div className="pt-2 flex flex-col gap-1">
+                            <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-1">
+                              <Plus size={10} /> Kayıt: {new Date(record.createdAt).toLocaleString('tr-TR')}
+                            </p>
+                            {record.completedAt && (
+                              <p className="text-[9px] font-bold text-emerald-500 uppercase tracking-widest flex items-center gap-1">
+                                <CheckCircle2 size={10} /> Tamamlanma: {new Date(record.completedAt).toLocaleString('tr-TR')}
+                              </p>
+                            )}
+                          </div>
+                        )}
                      </div>
                      
                      <div className="space-y-4">
@@ -299,15 +356,29 @@ export const ServiceManagement: React.FC<ServiceManagementProps> = ({ user }) =>
             
             <form onSubmit={handleSubmit} className="p-10 space-y-8 overflow-y-auto custom-scrollbar flex-1">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="space-y-3">
-                  <label className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.4em] ml-2">İşlem Tarihi</label>
-                  <input 
-                    required 
-                    type="date" 
-                    className="w-full p-6 border-2 border-zinc-100 dark:border-zinc-800 rounded-3xl bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-white font-black outline-none focus:border-orange-500 focus:bg-white dark:focus:bg-black transition-all cursor-pointer" 
-                    value={formData.date}
-                    onChange={e => setFormData({...formData, date: e.target.value})}
-                  />
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-3">
+                    <label className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.4em] ml-2">Kayıt Tarihi</label>
+                    <input 
+                      required 
+                      type="date" 
+                      className="w-full p-6 border-2 border-zinc-100 dark:border-zinc-800 rounded-3xl bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-white font-black outline-none focus:border-orange-500 transition-all cursor-pointer" 
+                      value={formData.date}
+                      onChange={e => setFormData({...formData, date: e.target.value})}
+                      onClick={(e) => (e.target as any).showPicker?.()}
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    <label className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.4em] ml-2">Kayıt Saati</label>
+                    <input 
+                      required 
+                      type="time" 
+                      className="w-full p-6 border-2 border-zinc-100 dark:border-zinc-800 rounded-3xl bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-white font-black outline-none focus:border-orange-500 transition-all cursor-pointer" 
+                      value={formData.startTime}
+                      onChange={e => setFormData({...formData, startTime: e.target.value})}
+                      onClick={(e) => (e.target as any).showPicker?.()}
+                    />
+                  </div>
                 </div>
 
                 <div className="space-y-3">
@@ -415,6 +486,43 @@ export const ServiceManagement: React.FC<ServiceManagementProps> = ({ user }) =>
                    </button>
                 </div>
               </div>
+
+              {(formData.status === 'COMPLETED' || formData.status === 'SCRAPPED') && (
+                <div className="bg-zinc-50 dark:bg-zinc-900/50 p-8 rounded-[2.5rem] border-2 border-zinc-100 dark:border-zinc-800 space-y-6 animate-in slide-in-from-top-4">
+                  <div className="flex items-center gap-3 mb-2">
+                    <CheckCircle2 size={24} className="text-emerald-500" />
+                    <h4 className="text-sm font-black text-zinc-900 dark:text-white uppercase tracking-widest">Teslimat Bilgileri</h4>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-3">
+                      <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-2">Teslim Tarihi</label>
+                      <input 
+                        required 
+                        type="date" 
+                        className="w-full p-5 border-2 border-zinc-100 dark:border-zinc-800 rounded-3xl bg-white dark:bg-zinc-950 text-zinc-900 dark:text-white font-black outline-none focus:border-emerald-500 transition-all cursor-pointer" 
+                        value={formData.completedDate}
+                        onChange={e => setFormData({...formData, completedDate: e.target.value})}
+                        onClick={(e) => (e.target as any).showPicker?.()}
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-2">Teslim Saati</label>
+                      <input 
+                        required 
+                        type="time" 
+                        className="w-full p-5 border-2 border-zinc-100 dark:border-zinc-800 rounded-3xl bg-white dark:bg-zinc-950 text-zinc-900 dark:text-white font-black outline-none focus:border-emerald-500 transition-all cursor-pointer" 
+                        value={formData.completedTime}
+                        onChange={e => setFormData({...formData, completedTime: e.target.value})}
+                        onClick={(e) => (e.target as any).showPicker?.()}
+                      />
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-zinc-400 font-medium italic px-2">
+                    * Sorun çözülüp cihaz teslim edildiği tarih ve saati giriniz. Bu bilgi servis süresi hesaplamasında kullanılacaktır.
+                  </p>
+                </div>
+              )}
 
               <div className="space-y-4">
                 <label className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.4em] ml-2">Servis Raporu / Resim</label>
